@@ -8,6 +8,8 @@ TO DO:
 
 retrain from scratch
 
+environment: opence-v1.5.1
+
 # The '0_exploration_new_data' Folder
 Where you will load and organize your training data and validation data by sentences with source and target data. This data will be aligned for the model to train on. A vocabalary dictionary will be created to contain the characters that appear in the data. This notebook also performs Levenshtein metrics on data. 
 
