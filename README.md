@@ -1,12 +1,6 @@
 # ocr_post_correction
 
-TO DO:
-* notebooks codes
-* vocabulary
-* training weights recent
-* code for original model where corrected model
-
-retrain from scratch
+Based on the open source model from: https://arxiv.org/abs/2109.06264 
 
 environment: opence-v1.5.1
 
