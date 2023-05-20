@@ -1,6 +1,8 @@
 # ------- on home -------
-#output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref/' # math/cite/refs -- just left in as raw
 output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref_large/' # math/cite/refs -- just left in as raw
+only_words = False
+
+
 aligned_dataset_dir = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/alignments/'
 ####historical_dataset_dir = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/historical_docs/groundtruth/'
 main_sanskrit_dir = '/Users/jnaiman/pe-ocr-sanskrit/' # should change this
@@ -16,6 +18,7 @@ test_latex = 'test_masked_n10000_20230503.csv'
 imod = 100
 
 nProcs = 6
+
 # -------------------------------------------------------------
 
 from torch import cuda
