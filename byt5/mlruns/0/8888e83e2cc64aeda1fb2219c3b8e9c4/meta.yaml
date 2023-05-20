@@ -1,0 +1,15 @@
+artifact_uri: file:///home/jnaiman/repos/ocr_post_correction/byt5/mlruns/0/8888e83e2cc64aeda1fb2219c3b8e9c4/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+name: ''
+run_id: 8888e83e2cc64aeda1fb2219c3b8e9c4
+run_uuid: 8888e83e2cc64aeda1fb2219c3b8e9c4
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1684513144984
+status: 1
+tags: []
+user_id: jnaiman
