@@ -81,6 +81,7 @@ reload(utils)
 import utils
 
 from utils import split_function_with_delimiters_with_checks as spc
+from utils import get_fill_in_types
 
 
 import yt
@@ -380,7 +381,16 @@ def add_formatted_columns(datain):
 # -------------------------------------------------------------
 
 test_df = pd.read_csv(aligned_dataset_dir + test_latex)
-test_df = test_df.rename(columns={"sentences source": "input_text", 
+# format
+if only_words:
+    if yt.is_root():
+        print('doing only words...')
+    test_df = add_formatted_columns(test_df)
+    # rename sentences we want
+    test_df = test_df.rename(columns={"words source": "input_text", 
+                        "words target": "target_text"})
+else:
+    test_df = test_df.rename(columns={"sentences source": "input_text", 
                         "sentences target": "target_text"})
 
 args_dict = {
@@ -470,7 +480,7 @@ for sto, ind in yt.parallel_objects(inds, nProcs, storage=my_storage):
         df2['predicted_text'] = str(dfout_here['predicted_text'].values[0])
         #if ind == 1:
         #    import sys; sys.exit()
-        df2.to_csv(output_dir_inf + 's' + str(int(ind)) + '.csv', index=False)
+        df2.to_csv(output_dir_inf + 's' + str(int(ind)) + ender + '.csv', index=False)
         del df2
         del dfout_here
     

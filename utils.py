@@ -121,3 +121,114 @@ def split_function_with_delimiters_with_checks(l,function='\\footnote',
         return ind1,ind2 # ind1 starts at the start of the function, ind3 at its closing bracket
     else:
         return ind1,ind2,error
+
+    
+def align_texts_fast(ocr_text, pdf_text, eops, 
+                     pdf_types = None, ocr_types = None):
+    
+    pdf_text_aligned2 = list(pdf_text)
+    ocr_text_aligned2 = list(pdf_text)
+
+    use_types = False
+
+    nadd = 0
+    if pdf_types is not None and ocr_types is not None:
+        pdf_type_aligned2 = list(pdf_types)
+        ocr_type_aligned2 = list(pdf_types)
+        use_types = True
+
+    for i in range(len(eops)):
+        # op, source index (ocr), destination index (pdf)
+        operation, sp,dp = eops[i]
+        if operation == 'replace': # there is a replacement
+            ocr_text_aligned2[dp+nadd] = ocr_text[sp]
+            if use_types:
+                ocr_type_aligned2[dp+nadd] = ocr_types[sp]
+
+        elif operation == 'insert': # insert in source (OCR)
+            ocr_text_aligned2[dp+nadd] = '^'
+            if use_types:
+                ocr_type_aligned2[dp+nadd] = '^'
+
+        elif operation == 'delete': # take off in OCR --> same as insert in PDF
+            pdf_text_aligned2.insert(dp+nadd,'@')
+            ocr_text_aligned2.insert(dp+nadd, ocr_text[sp])
+            if use_types:
+                ocr_type_aligned2.insert(dp+nadd, ocr_types[sp])
+                pdf_type_aligned2.insert(dp+nadd, '@')
+            nadd += 1 # update because we have now made the destination string longer
+        else:
+            print('unknown operation')
+            import sys; sys.exit()
+
+    pdf_text_aligned2 = "".join(pdf_text_aligned2)
+    ocr_text_aligned2 = "".join(ocr_text_aligned2)
+
+    if use_types:
+        pdf_type_aligned2 = "".join(pdf_type_aligned2)
+        ocr_type_aligned2 = "".join(ocr_type_aligned2)
+                      
+
+#     pdf_text_aligned2 = list(pdf_text)
+#     ocr_text_aligned2 = list(pdf_text)
+    
+#     use_types = False
+#     if pdf_types is not None and ocr_types is not None:
+#         pdf_type_aligned2 = list(pdf_types)
+#         ocr_type_aligned2 = list(pdf_types)
+#         use_types = True
+        
+
+#     for i in range(len(eops)):
+#         # op, source index (ocr), destination index (pdf)
+#         operation, sp,dp = eops[i]
+#         if operation == 'replace': # there is a replacement
+#             #pass
+#             ocr_text_aligned2[dp] = ocr_text[sp]
+#             if use_types:
+#                 ocr_type_aligned2[dp] = ocr_types[sp]
+                
+#         elif operation == 'insert': # insert in source (OCR)
+#             #ocr_text_aligned2.insert(dp,'^')
+#             ocr_text_aligned2[dp] = '^'
+#             if use_types:
+#                 ocr_type_aligned2[dp] = '^'
+#         elif operation == 'delete': # take off in OCR --> same as insert in PDF
+#             pdf_text_aligned2.insert(dp,'@')
+#             ocr_text_aligned2.insert(dp, ocr_text[sp])
+#             if use_types:
+#                 ocr_type_aligned2.insert(dp, ocr_types[sp])
+#                 pdf_type_aligned2.insert(dp, '@')
+#         else:
+#             print('unknown operation')
+#             import sys; sys.exit()
+
+#     pdf_text_aligned2 = "".join(pdf_text_aligned2)
+#     ocr_text_aligned2 = "".join(ocr_text_aligned2)
+    
+#     if use_types:
+#         pdf_type_aligned2 = "".join(pdf_type_aligned2)
+#         ocr_type_aligned2 = "".join(ocr_type_aligned2)
+        
+
+    if not use_types:
+        return ocr_text_aligned2, pdf_text_aligned2
+    else:
+        return ocr_text_aligned2, pdf_text_aligned2, ocr_type_aligned2, pdf_type_aligned2
+        
+
+# fill in types
+def get_fill_in_types(pdf_text_aligned_all_types):
+    # fill between in PDF @'s
+    fill_in_types = list(pdf_text_aligned_all_types)
+    for ifill in range(len(fill_in_types)):
+        if ifill==0:
+            if fill_in_types[ifill] == '@' and fill_in_types[ifill+1] != ' ':
+                fill_in_types[ifill] = fill_in_types[ifill+1]
+        else:
+            if fill_in_types[ifill] == '@':
+                if fill_in_types[ifill-1] != ' ':
+                    fill_in_types[ifill] = fill_in_types[ifill-1]
+    fill_in_types = "".join(fill_in_types) 
+    #realign_pages[pk]['PDF full fill types'] = fill_in_types
+    return fill_in_types
