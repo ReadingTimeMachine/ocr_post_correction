@@ -1,3 +1,7 @@
+def error_and_quit(message,ignore_quit=False,warn=True):
+    if warn: print(message)
+    if not ignore_quit: sys.exit()
+
 #https://stackoverflow.com/questions/29991917/indices-of-matching-parentheses-in-python
 def find_closing(text,dopen='(',dclose=')', debug=True,
                  remove_newline=False, check_closing=True):

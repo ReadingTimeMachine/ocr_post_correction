@@ -1,6 +1,13 @@
 # ------- on home -------
 #output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref/' # math/cite/refs -- just left in as raw
-output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref_large/' # math/cite/refs -- just left in as raw
+#output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref_large/' # math/cite/refs -- just left in as raw
+
+output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref_small_words/' 
+snapshot = 'checkpoint-31000' # set to None to take last
+ender = '_small_words' # 100k for training, 5k val
+only_words = True
+
+
 aligned_dataset_dir = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/alignments/'
 historical_dataset_dir = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/historical_docs/groundtruth/'
 main_sanskrit_dir = '/Users/jnaiman/pe-ocr-sanskrit/' # should change this
@@ -59,10 +66,9 @@ import signal
 
 from sys import path
 path.append(library_dir)
-#from utils import align_texts_fast
-#import Levenshtein
+import Levenshtein
 from utils import split_function_with_delimiters_with_checks as spc
-
+from utils import get_fill_in_types, align_texts_fast
 
 import yt
 yt.enable_parallelism()
@@ -322,6 +328,43 @@ class GPReviewDataset(Dataset):
           # "labels" : lbz
         }
     
+    
+def add_formatted_columns(datain):
+    source = []
+    target = []
+    source_aligned = []
+    target_aligned = []
+    for i in range(len(datain)):
+        d = datain.iloc[i]
+        s = np.array(list(d['aligned sentences source'])) # aligned source, with ^ symbols
+        t = np.array(list(d['aligned sentences target'])) # aligned target, with @ symbols
+        a = np.array(list(get_fill_in_types(d['aligned sentences target types'])))
+        if len(s) == len(t):
+            ss = "".join(s[np.where( (a == ' ') | (a == 'W') | (a == 'w'))[0]].tolist())
+            tt = "".join(t[np.where( (a == ' ') | (a == 'W') | (a == 'w'))[0]].tolist())
+        else:
+            print('have issue, testing')
+            if t[0] == ' ' and s[0] != ' ':
+                t = np.array(list(d['aligned sentences target']))[1:] # aligned target, with @ symbols
+                a = np.array(list(get_fill_in_types(d['aligned sentences target types'])))[1:]
+                if len(s) == len(t):
+                    ss = "".join(s[np.where( (a == ' ') | (a == 'W') | (a == 'w'))[0]].tolist())
+                    tt = "".join(t[np.where( (a == ' ') | (a == 'W') | (a == 'w'))[0]].tolist())
+                else:
+                    print('not aligned, best guess')
+                    import sys; sys.exit()
+
+        source_aligned.append(ss.replace('^','@')) # align with original 
+        target_aligned.append(tt)
+        source.append(ss.replace('^',''))
+        target.append(tt.replace('@',''))
+
+    datain['words source aligned'] = source_aligned
+    datain['words target aligned'] = target_aligned
+    datain['words source'] = source
+    datain['words target'] = target
+    return datain
+
 # -------------------------------------------------------------
 
 # test_df = pd.read_csv(aligned_dataset_dir + test_latex)
@@ -379,12 +422,22 @@ model.config.max_length=4096
 
 
 
-snapshots = glob(output_dir+'checkpoint*')
-order = []
-for s in snapshots:
-    order.append(s.split('-')[-1])
-argsort = np.argsort(np.array(order).astype('int'))
-snapshot = np.array(snapshots)[argsort][-1]
+# snapshots = glob(output_dir+'checkpoint*')
+# order = []
+# for s in snapshots:
+#     order.append(s.split('-')[-1])
+# argsort = np.argsort(np.array(order).astype('int'))
+# snapshot = np.array(snapshots)[argsort][-1]
+if snapshot == None:
+    snapshots = glob(output_dir+'checkpoint*')
+    order = []
+    for s in snapshots:
+        order.append(s.split('-')[-1])
+    argsort = np.argsort(np.array(order).astype('int'))
+    snapshot = np.array(snapshots)[argsort][-1]
+else:
+    snapshot = output_dir + snapshot
+
 
 ckpoint = snapshot.split('-')[-1]
 
@@ -398,12 +451,12 @@ inds = np.arange(0,len(historical_gt))
 start_time = time.time()
 
 my_storage = {}
-for sto, ind in yt.parallel_objects(inds, nProcs, storage=my_storage):
+for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
     
     filenames = []; pages = []; sents = []; 
     source = []; target = []
     types_here = []
-    with open(historical_gt[ind],'rb') as f:
+    with open(historical_gt[indd],'rb') as f:
         dir_test = pickle.load(f)
         
     filenames.append(dir_test['filename'])
@@ -417,17 +470,108 @@ for sto, ind in yt.parallel_objects(inds, nProcs, storage=my_storage):
                                            'target_text_unclean':target,
                                        'filename':filenames, 'page':pages,
                                        'sent num':sents, 'type':types_here})
-    df_historical_test_all = df_historical_test_all.rename(columns={"input_text_unclean": "input_text", 
-                            "target_text_unclean": "target_text"})
+        
     df_historical_test = df_historical_test_all.loc[df_historical_test_all['type'].isin(types)]
     if len(df_historical_test) == 0: # check if stuff in there
         continue
+        
+    if not only_words: # nothing fancy
+        df_historical_test = df_historical_test.rename(columns={"input_text_unclean": "input_text", 
+                                "target_text_unclean": "target_text"})
+    else: # take out all words
+        # get only words if need be
+        # ------ 1. inline math --------
+        pdf = dir_test['target']
+        target_types = np.repeat('W',len(dir_test['target'])) # all words to start
+        ind = 0
+        # mark inlines
+        while ind < len(pdf):
+            if '$' in pdf[ind:]:
+                i1 = pdf[ind:].index('$')
+                i2 = pdf[ind+i1+1:].index('$')+i1+1+1
+                target_types[ind+i1:ind+i2] = 'I'
+                ind += i2
+            else:
+                ind += len(pdf[ind:])
+
+        # ------ 2. citations -----
+        ind = 0
+        while ind < len(pdf):
+            if '\\cite' in pdf[ind:]:
+                ind1,ind2 = spc(pdf[ind:],function='\\cite',
+                        dopen='{',dclose='}',
+                       error_out=True)
+                if ind1 != -1 and ind2 != -1:
+                    target_types[ind+ind1:ind+ind2] = 'C'            
+                    ind += ind2
+                else:
+                    print('issue with matching {} in cite')
+                    ind += 1
+            else:
+                ind += len(pdf[ind:])
 
 
+         # ------ 3. refs -----
+        ind = 0
+        while ind < len(pdf):
+            if '\\ref' in pdf[ind:]:
+                ind1,ind2 = spc(pdf[ind:],function='\\ref',
+                        dopen='{',dclose='}',
+                       error_out=True)
+                if ind1 != -1 and ind2 != -1:
+                    target_types[ind+ind1:ind+ind2] = 'R'            
+                    ind += ind2
+                else:
+                    print('issue with matching braket in ref!')
+                    ind += 1
+            else:
+                ind += len(pdf[ind:])
 
-    if ind%imod == 0:
+        # finally, anything else like a special char
+        ind = 0
+        while ind < len(pdf):
+            if '\\' in pdf[ind:]:
+                # already tagged as something?
+                indexb = pdf[ind:].index('\\')
+                if target_types[ind+indexb] == 'W': # not already tagged
+                    ind1,ind2 = spc(pdf[ind:],function='\\',
+                            dopen='{',dclose='}',
+                           error_out=True)
+                    if ind1 != -1 and ind2 != -1:
+                        target_types[ind+ind1:ind+ind2] = 'O'            
+                        ind += ind2
+                    else:
+                        print('issue with matching {} in other!')
+                        ind += 1
+                else:
+                    ind += 1
+            else:
+                ind += len(pdf[ind:])
+
+        #df_historical_test_all = df_historical_test_all.rename(columns={"input_text_unclean": "input_text", 
+        #                            "target_text_unclean": "target_text"})
+        inds1 = np.where(target_types == 'W')
+        if len(inds1) > 0: # have stuff
+            x = np.array(list(df_historical_test['input_text_unclean'].values[0]))
+            y = np.array(list(df_historical_test['target_text_unclean'].values[0]))
+            # align x to y
+            eops = Levenshtein.editops(x, y)
+            xalign,yalign,xtypes,ytypes = align_texts_fast(x,y,eops,
+                                                           pdf_types=target_types, 
+                                                           ocr_types='W'*len(x))
+            full_types = get_fill_in_types(ytypes)
+            inds2 = np.where(np.array(list(full_types)) == 'W')[0]
+            df_historical_test['input_text'] = "".join(np.array(list(xalign))[inds2]).replace('^','')
+            df_historical_test['target_text'] = "".join(np.array(list(yalign))[inds2]).replace('@','')
+        else:
+            continue
+        
+    #import sys; sys.exit()
+
+
+    if indd%imod == 0:
         end_time = time.time()
-        print('on', ind, 'of', len(inds),'in', end_time-start_time, 'seconds, or',
+        print('on', indd, 'of', len(inds),'in', end_time-start_time, 'seconds, or',
              (end_time-start_time)/60., 'minutes')
         start_time = time.time()
     # dfout_here,err = store_file(snapshot, ckpoint, 
@@ -440,7 +584,7 @@ for sto, ind in yt.parallel_objects(inds, nProcs, storage=my_storage):
     if not err:
         df2 = df_historical_test.copy()
         df2['predicted_text'] = str(dfout_here['predicted_text'].values[0])
-        df2.to_csv(output_dir_inf + dir_test['filename'] + '.csv', index=False)
+        df2.to_csv(output_dir_inf + dir_test['filename'] + ender+'.csv', index=False)
         del df2
         del dfout_here
         
