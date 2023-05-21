@@ -1,7 +1,17 @@
 # ------- on home -------
-output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref_large/' # math/cite/refs -- just left in as raw
-only_words = False
+# output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref_large/' # math/cite/refs -- just left in as raw
+# # names of the tex latex file
+# test_latex = 'test_masked_n10000_20230503.csv'
+# only_words = False
+# ender = ''
 
+output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref_small_words/' # this is just the words
+test_latex = 'test_masked_n5000_20230510.csv'
+only_words = True
+ender = '_small_words' # 100k for training, 5k val
+snapshot = 'checkpoint-31000' # set to None to take last
+
+# --------------------------------------------
 
 aligned_dataset_dir = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/alignments/'
 ####historical_dataset_dir = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/historical_docs/groundtruth/'
@@ -12,8 +22,6 @@ library_dir = '../'
 output_dir_inf = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/inferences/latex/'
 
 
-# names of the tex latex file
-test_latex = 'test_masked_n10000_20230503.csv'
 
 imod = 100
 
@@ -65,6 +73,13 @@ from sys import path
 path.append(library_dir)
 #from utils import align_texts_fast
 #import Levenshtein
+
+# debug
+import utils
+from importlib import reload
+reload(utils)
+import utils
+
 from utils import split_function_with_delimiters_with_checks as spc
 
 
@@ -418,13 +433,15 @@ tokenizer.model_max_length=4096
 model.config.max_length=4096
 
 
-
-snapshots = glob(output_dir+'checkpoint*')
-order = []
-for s in snapshots:
-    order.append(s.split('-')[-1])
-argsort = np.argsort(np.array(order).astype('int'))
-snapshot = np.array(snapshots)[argsort][-1]
+if snapshot == None:
+    snapshots = glob(output_dir+'checkpoint*')
+    order = []
+    for s in snapshots:
+        order.append(s.split('-')[-1])
+    argsort = np.argsort(np.array(order).astype('int'))
+    snapshot = np.array(snapshots)[argsort][-1]
+else:
+    snapshot = output_dir + snapshot
 
 ckpoint = snapshot.split('-')[-1]
 
