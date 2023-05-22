@@ -1,11 +1,20 @@
 # ------- on home -------
-#output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref/' # math/cite/refs -- just left in as raw
-#output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref_large/' # math/cite/refs -- just left in as raw
 
-output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref_small_words/' 
-snapshot = 'checkpoint-31000' # set to None to take last
-ender = '_small_words' # 100k for training, 5k val
-only_words = True
+# # ----- just words --------
+# output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref_small_words/' 
+# # where to save everybody
+# output_dir_inf = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/inferences/historical/'
+# snapshot = 'checkpoint-31000' # set to None to take last
+# ender = '_small_words' # 100k for training, 5k val
+# only_words = True
+
+# -------- full --------
+output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref_large/' 
+# where to save everybody
+output_dir_inf = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/inferences/historical_full/'
+snapshot = 'checkpoint-87000' # set to None to take last
+ender = '_full_large' # 100k for training, 5k val
+only_words = False
 
 
 aligned_dataset_dir = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/alignments/'
@@ -13,8 +22,6 @@ historical_dataset_dir = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCor
 main_sanskrit_dir = '/Users/jnaiman/pe-ocr-sanskrit/' # should change this
 library_dir = '../'
 
-# where to save everybody
-output_dir_inf = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/inferences/historical/'
 
 # which types of groundtruths are we wanting to use?
 types = ['plain', 'author location']
@@ -634,8 +641,8 @@ for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
     
     if not err:
         df2 = df_historical_test.copy()
-        print('predicted :', str(dfout_here['predicted_text'].values[0]))
-        print('')
+        #print('predicted :', str(dfout_here['predicted_text'].values[0]))
+        #print('')
         df2['predicted_text'] = str(dfout_here['predicted_text'].values[0])
         df2.to_csv(output_dir_inf + dir_test['filename'] + ender+'.csv', index=False)
         
