@@ -22,6 +22,8 @@ types = ['plain', 'author location']
 imod = 10
 
 nProcs = 6
+
+special_char = ['\\%', '\\&']
 # -------------------------------------------------------------
 
 from torch import cuda
@@ -527,6 +529,52 @@ for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
             else:
                 ind += len(pdf[ind:])
 
+                
+        # special characters
+        for sc in special_char:
+            ind = 0
+            while ind < len(pdf):
+                if sc in pdf[ind:]:
+                    # already tagged as something?
+                    indexb = pdf[ind:].index(sc)
+                    test_types = "".join(target_types[ind+indexb:ind+indexb+len(sc)])
+                    if test_types == 'W'*len(test_types): # not already tagged
+                        ind1 = indexb
+                        ind2 = indexb+len(sc)
+                        target_types[ind+ind1:ind+ind2] = 'S'            
+                        ind += ind2
+                    else:
+                        ind += 1
+                else:
+                    ind += len(pdf[ind:])
+        
+        # look for any {} that haven't been tagged yet
+        ind = 0
+        while ind < len(pdf):
+            if '{' in pdf[ind:]:
+                # already tagged as something?
+                indexb = pdf[ind:].index('{')
+                if target_types[ind+indexb] == 'W': # not already tagged as something
+                    #ind1,ind2 = spc(pdf[ind:],function='',
+                    #        dopen='{',dclose='}',
+                    #       error_out=True)
+                    ind1 = indexb
+                    ind2 = -1
+                    try:
+                        ind2 = pdf[ind+ind1:].index('}') + ind1 + 1
+                    except:
+                        print('no matching }')
+                    if ind1 != -1 and ind2 != -1:
+                        target_types[ind+ind1:ind+ind2] = 'B'            
+                        ind += ind2
+                    else:
+                        print('issue with matching {} in other!')
+                        ind += 1
+                else:
+                    ind += 1
+            else:
+                ind += len(pdf[ind:])
+        
         # finally, anything else like a special char
         ind = 0
         while ind < len(pdf):
@@ -552,8 +600,8 @@ for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
         #                            "target_text_unclean": "target_text"})
         inds1 = np.where(target_types == 'W')
         if len(inds1) > 0: # have stuff
-            x = np.array(list(df_historical_test['input_text_unclean'].values[0]))
-            y = np.array(list(df_historical_test['target_text_unclean'].values[0]))
+            x = "".join(np.array(list(df_historical_test['input_text_unclean'].values[0])))
+            y = "".join(np.array(list(df_historical_test['target_text_unclean'].values[0])))
             # align x to y
             eops = Levenshtein.editops(x, y)
             xalign,yalign,xtypes,ytypes = align_texts_fast(x,y,eops,
@@ -563,10 +611,13 @@ for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
             inds2 = np.where(np.array(list(full_types)) == 'W')[0]
             df_historical_test['input_text'] = "".join(np.array(list(xalign))[inds2]).replace('^','')
             df_historical_test['target_text'] = "".join(np.array(list(yalign))[inds2]).replace('@','')
+            print('ocr :', x)
+            print('pdf :', y)
+            print('input ocr    :', df_historical_test['input_text'].values[0])
+            print('input target :', df_historical_test['target_text'].values[0])
         else:
             continue
         
-    #import sys; sys.exit()
 
 
     if indd%imod == 0:
@@ -583,10 +634,13 @@ for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
     
     if not err:
         df2 = df_historical_test.copy()
+        print('predicted :', str(dfout_here['predicted_text'].values[0]))
+        print('')
         df2['predicted_text'] = str(dfout_here['predicted_text'].values[0])
         df2.to_csv(output_dir_inf + dir_test['filename'] + ender+'.csv', index=False)
+        
+        #if ('CL94' in dfout_here['predicted_text'].values[0]) and ('here is not the expansion velocity' not in dfout_here['target_text'].values[0]): 
+        #    import sys; sys.exit()
+   
         del df2
         del dfout_here
-        
-    #import sys; sys.exit()
-    

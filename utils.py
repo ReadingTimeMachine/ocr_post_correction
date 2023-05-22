@@ -1,3 +1,5 @@
+import sys
+
 def error_and_quit(message,ignore_quit=False,warn=True):
     if warn: print(message)
     if not ignore_quit: sys.exit()

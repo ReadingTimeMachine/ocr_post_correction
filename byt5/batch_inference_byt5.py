@@ -1,15 +1,16 @@
 # ------- on home -------
-# output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref_large/' # math/cite/refs -- just left in as raw
-# # names of the tex latex file
-# test_latex = 'test_masked_n10000_20230503.csv'
-# only_words = False
-# ender = ''
+output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref_large/' # math/cite/refs -- just left in as raw
+# names of the tex latex file
+test_latex = 'test_masked_n10000_20230503.csv'
+only_words = False
+ender = '_full_large'
+snapshot = 'checkpoint-87000'
 
-output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref_small_words/' # this is just the words
-test_latex = 'test_masked_n5000_20230510.csv'
-only_words = True
-ender = '_small_words' # 100k for training, 5k val
-snapshot = 'checkpoint-31000' # set to None to take last
+# output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref_small_words/' # this is just the words
+# test_latex = 'test_masked_n5000_20230510.csv'
+# only_words = True
+# ender = '_small_words' # 100k for training, 5k val
+# snapshot = 'checkpoint-31000' # set to None to take last
 
 # --------------------------------------------
 
@@ -19,9 +20,7 @@ main_sanskrit_dir = '/Users/jnaiman/pe-ocr-sanskrit/' # should change this
 library_dir = '../'
 
 # where to save everybody
-output_dir_inf = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/inferences/latex/'
-
-
+output_dir_inf = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/inferences/latex_full/'
 
 imod = 100
 
@@ -478,17 +477,7 @@ for sto, ind in yt.parallel_objects(inds, nProcs, storage=my_storage):
     if not err:
         df2 = test_df.iloc[ind].to_frame().T.copy()
         df2['predicted_text'] = str(dfout_here['predicted_text'].values[0])
-        #if ind == 1:
-        #    import sys; sys.exit()
         df2.to_csv(output_dir_inf + 's' + str(int(ind)) + ender + '.csv', index=False)
         del df2
         del dfout_here
     
-    #import sys; sys.exit()
-    # if i==0: # first
-    #     dfout = dfout_here.copy()
-    # else:
-    #     dfout = pd.concat([dfout,dfout_here],ignore_index=True)
-    
-#end_time = time.time()
-#print('done with', ntest_arxiv, 'in', (end_time-start_time)/60., 'minutes')
