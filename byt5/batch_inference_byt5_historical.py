@@ -315,6 +315,44 @@ def store_file(fullpath, checkpoint, df_test, save_file=None, wait=2.0,
 
     return res, err
 
+# this just uses a model
+def store_file_model(model, df_test, save_file=None, wait=2.0,
+              verbose=True): # timeout in minutes
+    wait *= 60.0
+    ocr_pipeline = pipeline(
+        'text2text-generation',
+        model = model,
+        tokenizer=tokenizer)
+
+    #print('Model Loaded')
+    start = time.time()
+    #print('Time is ', start)
+    results = [] 
+    data = list(df_test.input_text.values)
+    err = False
+    try:
+        with timeout(seconds=int(wait)):
+            results = ocr_pipeline(data)
+
+        if verbose: print('Total time taken to process is ', round(time.time()-start,2), 'seconds')
+        pred_resultz = []
+        for i in list(range(len(results))):
+            for k,e in results[i].items():
+                pred_resultz.append(e)
+
+        res = pd.DataFrame(zip(df_test.input_text.values,
+                               df_test.target_text.values,
+                               pred_resultz),columns = ['input_text','target_text','predicted_text'])
+
+    except:
+        print('Timeout it is then...')
+        res = pd.DataFrame({'input_text':[],'target_text':[],'predicted_text':[]})
+        err = True
+        
+    if save_file is not None:
+        res.to_csv(save_file,index = False,sep=';')
+
+    return res, err
 
 class GPReviewDataset(Dataset):
     def __init__(self, Text, Label):
@@ -639,11 +677,17 @@ for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
                                 df_historical_test,
                                verbose = False)
     
-    if not err:
+    # with orig model
+    dfout_here2,err2 = store_file_model(model, 
+                                df_historical_test,
+                               verbose = False)
+    
+    if not err and not err2:
         df2 = df_historical_test.copy()
         #print('predicted :', str(dfout_here['predicted_text'].values[0]))
         #print('')
         df2['predicted_text'] = str(dfout_here['predicted_text'].values[0])
+        df2['predicted_text_defaultModel'] = str(dfout_here2['predicted_text'].values[0])
         df2.to_csv(output_dir_inf + dir_test['filename'] + ender+'.csv', index=False)
         
         #if ('CL94' in dfout_here['predicted_text'].values[0]) and ('here is not the expansion velocity' not in dfout_here['target_text'].values[0]): 
@@ -651,3 +695,4 @@ for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
    
         del df2
         del dfout_here
+        del dfout_here2
