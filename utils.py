@@ -1,4 +1,7 @@
 import sys
+import pandas as pd
+import numpy as np
+import altair as alt
 
 def error_and_quit(message,ignore_quit=False,warn=True):
     if warn: print(message)
@@ -238,3 +241,223 @@ def get_fill_in_types(pdf_text_aligned_all_types):
     fill_in_types = "".join(fill_in_types) 
     #realign_pages[pk]['PDF full fill types'] = fill_in_types
     return fill_in_types
+
+
+# for plotting, if you want to chop by tolerance
+def subset_by_percent(dfin, tol = 0.01, verbose=True, round_off = 2, 
+                     tol_count = None, reset_index = True, 
+                     replace_insert = True, replace_deletion = True):
+    """
+    tol : in % (so 1.0 will be 1%, 0.1 will be 0.1%)
+    tol_count : if not None, will over-write tol and subset by count
+    """
+    if tol_count is None:
+        dfin_subset = dfin.loc[dfin['counts']> tol].copy()
+    else:
+        dfin_subset = dfin.loc[dfin['counts unnormalized']> tol_count].copy()
+
+    # also, add the tool tip
+    names = []
+    for i in range(len(dfin_subset)):
+        d = dfin_subset.iloc[i]
+        names.append(str(round(d['counts'],2))+'%')
+    dfin_subset['name']=names
+    
+    # rename columns for plotting 
+    dfin_subset = dfin_subset.rename(columns={"counts": "% of all OCR tokens", 
+                                              "counts unnormalized": "Total Count of PDF token"})
+    if reset_index:
+        dfin_subset = dfin_subset.reset_index(drop=True)
+        
+    # replace insert
+    if replace_insert:
+        dfin_subset.loc[(dfin_subset['ocr_letters']=='^')&(dfin_subset['pdf_letters']!='^'),'ocr_letters'] = 'INSERT'
+    if replace_deletion:
+        dfin_subset.loc[(dfin_subset['pdf_letters']=='@')&(dfin_subset['ocr_letters']!='@'),'pdf_letters'] = 'DELETE'
+
+    if verbose:
+        print('shape of output=', dfin_subset.shape)
+    return dfin_subset
+
+
+
+# function for plots -- with histogramsmin_percent
+def return_matrix_chart_withHist(dfin,  dfin_larger, textsize=20, stroke='black', 
+                        height=800, width=900, scheme='viridis', 
+                       log=True, color_title = 'Percent in %',
+                       pdf_tag = 'PDF', ocr_tag = 'OCR',
+                       return_sort_ocr=False,
+                       percent_column = "% of all OCR tokens",
+                       count_column = "Total Count of PDF token",
+                       pdf_title='PDF Characters', ocr_title='OCR Characters',
+                                hist_width=800, min_percent = 1.0, hist_labelFontSize=16, 
+                                hist_location = 'right', 
+                            legend_length = 200, legend_Y = -50,legend_direction='horizontal',
+                                color_selection = False):
+    
+    # for colormap legend
+    # legend placement
+    length = legend_length
+    legendY = legend_Y
+    legendX = 0 + width//2 - length//2
+
+    
+    sort_pdf = np.unique(dfin['pdf_letters']).tolist()
+    sort_pdf.sort()
+    extra_ocr = []
+    for o in dfin['ocr_letters'].unique():
+        if o not in sort_pdf:
+            extra_ocr.append(o)
+
+    extra_ocr.sort()
+
+    sort_ocr = sort_pdf.copy()
+    sort_ocr.extend(extra_ocr)
+    
+    # check special characters:
+    for i in range(len(sort_pdf)):
+        if '\\' in repr(sort_pdf[i]): # have escaped
+            sort_pdf[i] = re.escape(repr(sort_pdf[i]))
+        
+    for i in range(len(sort_ocr)):
+        if '\\' in repr(sort_ocr[i]): # have escaped
+            sort_ocr[i] = re.escape(repr(sort_ocr[i]))
+            
+    # also clean dataframe
+    for i in range(len(dfin)):
+        for c in ['pdf_letters','ocr_letters']:
+            esc = repr(dfin.iloc[i][c])
+            if '\\' in esc: # have escaped
+                dfin.at[i,c]=re.escape(esc)
+                    
+    # maybe some special words?
+    for iss,s in enumerate(sort_ocr):
+        if 'if' == s:
+            #sort_ocr[iss] = "''if"
+            sort_ocr[iss] = '"if"' #str('if')
+            #sort_ocr[iss] = u'if'
+    # maybe some special words?
+    for iss,s in enumerate(sort_pdf):
+        if 'if' == s:
+            #sort_pdf[iss] = "''if"
+            sort_pdf[iss] = '"if"' #str('if')
+            #sort_pdf[iss] = u'if'
+
+
+    if color_selection:
+        column_select = alt.selection_point(fields=['column'],
+                                     bind=alt.binding_select(options=[percent_column, 
+                                                                      count_column], 
+                                                             name='Color by: '),
+                                     value=percent_column)
+        color_col = 'value'
+    else:
+        color_col = percent_column
+
+    selector = alt.selection_point(encodings=['y'])#, init={pdf_letters:'A'})
+    opacity = alt.condition(selector,alt.value(1),alt.value(0.25))
+
+
+    if log:
+        if not color_selection:
+            color = alt.Color(color_col+":Q", scale=alt.Scale(type='log',scheme=scheme,domain=[min_percent,100]),title=color_title,
+                              legend=alt.Legend(
+                            orient='none',
+                            legendX=legendX, legendY=legendY,
+                            direction=legend_direction,
+                            titleAnchor='middle', gradientLength=length))
+        else:
+            color = alt.Color(color_col+":Q", scale=alt.Scale(type='log',scheme=scheme),title=color_title,
+                              legend=alt.Legend(
+                            orient='none',
+                            legendX=legendX, legendY=legendY,
+                            direction=legend_direction,
+                            titleAnchor='middle', gradientLength=length))
+    else:
+        if not color_selection:
+            color = alt.Color(color_col+":Q", scale=alt.Scale(scheme=scheme,domain=[min_percent,100]),title=color_title,
+                              legend=alt.Legend(
+                            orient='none',
+                            legendX=legendX, legendY=legendY,
+                            direction=legend_direction,
+                            titleAnchor='middle', gradientLength=length))
+        else:
+            color = alt.Color(color_col+":Q", scale=alt.Scale(scheme=scheme),title=color_title,
+                              legend=alt.Legend(
+                            orient='none',
+                            legendX=legendX, legendY=legendY,
+                            direction=legend_direction,
+                            titleAnchor='middle', gradientLength=length))
+        
+    if not color_selection:
+        chart1 = alt.Chart(dfin).mark_rect().transform_fold(
+            fold=[percent_column, count_column],
+            as_=['column', 'value']
+        ).encode(
+            alt.Y("pdf_letters:O",sort=sort_pdf,title=pdf_title),
+            alt.X("ocr_letters:O",sort=sort_ocr,title=ocr_title),
+            color=color,
+            opacity=opacity,
+            tooltip=[alt.Tooltip("pdf_letters:O",title=pdf_tag), 
+                     alt.Tooltip("ocr_letters:O",title=ocr_tag), 
+                     alt.Tooltip("name:N",title='Percentage'),
+                    alt.Tooltip(count_column+':Q',title='Count')]
+        ).properties(
+            height=height,
+            width=width
+        ).add_params(
+            selector
+        )
+
+    else:
+        chart1 = alt.Chart(dfin).mark_rect().transform_fold(
+            fold=[percent_column, count_column],
+            as_=['column', 'value']
+        ).transform_filter(
+            column_select
+        ).encode(
+            alt.Y("pdf_letters:O",sort=sort_pdf,title=pdf_title),
+            alt.X("ocr_letters:O",sort=sort_ocr,title=ocr_title),
+            color=color,
+            opacity=opacity,
+            tooltip=[alt.Tooltip("pdf_letters:O",title=pdf_tag), 
+                     alt.Tooltip("ocr_letters:O",title=ocr_tag), 
+                     alt.Tooltip("name:N",title='Percentage'),
+                    alt.Tooltip(count_column+':Q',title='Count')]
+        ).properties(
+            height=height,
+            width=width
+        ).add_params(
+            selector,
+            column_select
+        )
+        
+    chart2 = alt.Chart(dfin_larger).mark_bar().transform_filter(
+        selector
+    ).transform_filter(
+       alt.FieldRangePredicate(field=percent_column, range=[100, min_percent])
+       #alt.FieldRangePredicate(field=percent_column, range=[100, slider])
+    ).encode(
+        alt.X('ocr_letters:O', sort='-y',title=ocr_title),#,labelFontSize=hist_labelFontSize),
+        alt.Y("% of all OCR tokens:Q"),#, 
+            tooltip=[alt.Tooltip("pdf_letters:O",title=pdf_tag), 
+                 alt.Tooltip("ocr_letters:O",title=ocr_tag), 
+                 alt.Tooltip("name:N",title='Percentage'),
+                alt.Tooltip(count_column+':Q',title='Count')]
+
+    ).properties(
+        width=hist_width
+    )
+
+    if hist_location == 'bottom':
+        chart = alt.vconcat(chart1, chart2, center=True)
+    elif hist_location == 'right':
+        chart = alt.hconcat(chart1,chart2,center=True)
+    else:
+        print('not supported location for hist, will place on right')
+        chart = alt.hconcat(chart1,chart2,center=True)
+
+    if return_sort_ocr:
+        return chart, sort_ocr
+    #return chart,chart1    
+    return chart
