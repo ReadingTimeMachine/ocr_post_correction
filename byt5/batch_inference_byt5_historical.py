@@ -16,6 +16,11 @@ snapshot = 'checkpoint-87000' # set to None to take last
 ender = '_full_large' # 100k for training, 5k val
 only_words = False
 
+# also, test with a model that has been trained on *just* the historical dataset
+output_dir_hist = '/Users/jnaiman/Downloads/tmp/byt5_ocr_full_hal_historical/' 
+# where to save everybody
+####output_dir_inf_hist = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/inferences/historical_histOnly/'
+snapshot_hist = 'checkpoint-160' # set to None to take last
 
 aligned_dataset_dir = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/alignments/'
 historical_dataset_dir = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/historical_docs/groundtruth/'
@@ -485,8 +490,20 @@ if snapshot == None:
 else:
     snapshot = output_dir + snapshot
 
+# historical trained only
+if snapshot_hist == None:
+    snapshots_hist = glob(output_dir_hist+'checkpoint*')
+    order = []
+    for s in snapshots_hist:
+        order.append(s.split('-')[-1])
+    argsort = np.argsort(np.array(order).astype('int'))
+    snapshot_hist = np.array(snapshots_hist)[argsort][-1]
+else:
+    snapshot_hist = output_dir_hist + snapshot_hist
+
 
 ckpoint = snapshot.split('-')[-1]
+ckpoint_hist = snapshot_hist.split('-')[-1]
 
 historical_gt = glob(historical_dataset_dir + '*pickle')
 
@@ -676,18 +693,22 @@ for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
     dfout_here,err = store_file(snapshot, ckpoint, 
                                 df_historical_test,
                                verbose = False)
+    dfout_here_hist,err_hist = store_file(snapshot_hist, ckpoint_hist, 
+                                df_historical_test,
+                               verbose = False)
     
     # with orig model
     dfout_here2,err2 = store_file_model(model, 
                                 df_historical_test,
                                verbose = False)
     
-    if not err and not err2:
+    if not err and not err2 and not err_hist:
         df2 = df_historical_test.copy()
         #print('predicted :', str(dfout_here['predicted_text'].values[0]))
         #print('')
         df2['predicted_text'] = str(dfout_here['predicted_text'].values[0])
         df2['predicted_text_defaultModel'] = str(dfout_here2['predicted_text'].values[0])
+        df2['predicted_text_histOnlyModel'] = str(dfout_here_hist['predicted_text'].values[0])
         df2.to_csv(output_dir_inf + dir_test['filename'] + ender+'.csv', index=False)
         
         #if ('CL94' in dfout_here['predicted_text'].values[0]) and ('here is not the expansion velocity' not in dfout_here['target_text'].values[0]): 
