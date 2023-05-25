@@ -175,50 +175,7 @@ def align_texts_fast(ocr_text, pdf_text, eops,
 
     if use_types:
         pdf_type_aligned2 = "".join(pdf_type_aligned2)
-        ocr_type_aligned2 = "".join(ocr_type_aligned2)
-                      
-
-#     pdf_text_aligned2 = list(pdf_text)
-#     ocr_text_aligned2 = list(pdf_text)
-    
-#     use_types = False
-#     if pdf_types is not None and ocr_types is not None:
-#         pdf_type_aligned2 = list(pdf_types)
-#         ocr_type_aligned2 = list(pdf_types)
-#         use_types = True
-        
-
-#     for i in range(len(eops)):
-#         # op, source index (ocr), destination index (pdf)
-#         operation, sp,dp = eops[i]
-#         if operation == 'replace': # there is a replacement
-#             #pass
-#             ocr_text_aligned2[dp] = ocr_text[sp]
-#             if use_types:
-#                 ocr_type_aligned2[dp] = ocr_types[sp]
-                
-#         elif operation == 'insert': # insert in source (OCR)
-#             #ocr_text_aligned2.insert(dp,'^')
-#             ocr_text_aligned2[dp] = '^'
-#             if use_types:
-#                 ocr_type_aligned2[dp] = '^'
-#         elif operation == 'delete': # take off in OCR --> same as insert in PDF
-#             pdf_text_aligned2.insert(dp,'@')
-#             ocr_text_aligned2.insert(dp, ocr_text[sp])
-#             if use_types:
-#                 ocr_type_aligned2.insert(dp, ocr_types[sp])
-#                 pdf_type_aligned2.insert(dp, '@')
-#         else:
-#             print('unknown operation')
-#             import sys; sys.exit()
-
-#     pdf_text_aligned2 = "".join(pdf_text_aligned2)
-#     ocr_text_aligned2 = "".join(ocr_text_aligned2)
-    
-#     if use_types:
-#         pdf_type_aligned2 = "".join(pdf_type_aligned2)
-#         ocr_type_aligned2 = "".join(ocr_type_aligned2)
-        
+        ocr_type_aligned2 = "".join(ocr_type_aligned2)        
 
     if not use_types:
         return ocr_text_aligned2, pdf_text_aligned2
@@ -246,7 +203,8 @@ def get_fill_in_types(pdf_text_aligned_all_types):
 # for plotting, if you want to chop by tolerance
 def subset_by_percent(dfin, tol = 0.01, verbose=True, round_off = 2, 
                      tol_count = None, reset_index = True, 
-                     replace_insert = True, replace_deletion = True):
+                     replace_insert = True, replace_deletion = True, 
+                    track_insert_delete = False):
     """
     tol : in % (so 1.0 will be 1%, 0.1 will be 0.1%)
     tol_count : if not None, will over-write tol and subset by count
@@ -274,6 +232,18 @@ def subset_by_percent(dfin, tol = 0.01, verbose=True, round_off = 2,
         dfin_subset.loc[(dfin_subset['ocr_letters']=='^')&(dfin_subset['pdf_letters']!='^'),'ocr_letters'] = 'INSERT'
     if replace_deletion:
         dfin_subset.loc[(dfin_subset['pdf_letters']=='@')&(dfin_subset['ocr_letters']!='@'),'pdf_letters'] = 'DELETE'
+        
+    d = dfin_subset.loc[(dfin_subset['ocr_letters']=='INSERT')&(dfin_subset['pdf_letters']=='DELETE')]
+    if track_insert_delete:
+        if len(d) > 0:
+            print('Have overlap of insert and delete!')
+            print(len(d))
+    else: # assume error
+        dfin_subset.loc[(dfin_subset['ocr_letters']=='INSERT')&(dfin_subset['pdf_letters']=='DELETE'),
+                        '% of all OCR tokens'] = np.nan
+        dfin_subset.loc[(dfin_subset['ocr_letters']=='INSERT')&(dfin_subset['pdf_letters']=='DELETE'),
+                        "Total Count of PDF token"] = np.nan
+
 
     if verbose:
         print('shape of output=', dfin_subset.shape)
