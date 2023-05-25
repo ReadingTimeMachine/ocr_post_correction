@@ -293,7 +293,8 @@ def return_matrix_chart_withHist(dfin,  dfin_larger, textsize=20, stroke='black'
                                 hist_width=800, min_percent = 1.0, hist_labelFontSize=16, 
                                 hist_location = 'right', 
                             legend_length = 200, legend_Y = -50,legend_direction='horizontal',
-                                color_selection = False):
+                                color_selection = False,
+                                insert_delete_at_end = True):
     
     # for colormap legend
     # legend placement
@@ -313,6 +314,17 @@ def return_matrix_chart_withHist(dfin,  dfin_larger, textsize=20, stroke='black'
 
     sort_ocr = sort_pdf.copy()
     sort_ocr.extend(extra_ocr)
+    
+    # move both delete and insert to the end(?)
+    if insert_delete_at_end:
+        if 'INSERT' in sort_ocr:
+            i = sort_ocr.index('INSERT')
+            sort_ocr.pop(i)
+            sort_ocr.append('INSERT')
+        if 'DELETE' in sort_pdf:
+            i = sort_pdf.index('DELETE')
+            sort_pdf.pop(i)
+            sort_pdf.append('DELETE')
     
     # check special characters:
     for i in range(len(sort_pdf)):
