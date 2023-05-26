@@ -481,22 +481,29 @@ def return_dropdown_hist(dfin_larger,
     hist_width=800,
     min_percent = 0.01,
     pdf_title='PDF Characters',
-    ocr_title='OCR Characters'):
+    ocr_title='OCR Characters',
+                        ylog=False):
 
     input_dropdown = alt.binding_select(options=np.sort(dfin_larger['pdf_letters'].unique()), 
-                                        name=pdf_title + ':')
-    selector = alt.selection_point(fields=['pdf_letters'], bind=input_dropdown, 
-                                   value=np.sort(dfin_larger['pdf_letters'].unique())[0])
-                                   #value={'pdf_letters':str(np.sort(dfin_larger['pdf_letters'].unique())[0])})
-    #value={"year": 2000}
+                                        name=pdf_title + ': ')
+    selector = alt.selection_point(fields=['pdf_letters'], 
+                                   bind=input_dropdown,
+                            value=np.sort(dfin_larger['pdf_letters'].unique())[0])
 
+    yaxis = alt.Y("% of all OCR tokens:Q",
+                 scale=alt.Scale(domain=[min_percent,100]))
+    if ylog:
+        yaxis = alt.Y("% of all OCR tokens:Q", 
+                      scale=alt.Scale(type='symlog',
+                                      domain=[min_percent,100]))
+        
     chart2 = alt.Chart(dfin_larger).mark_bar().transform_filter(
         selector
     ).transform_filter(
        alt.FieldRangePredicate(field=percent_column, range=[100, min_percent])
     ).encode(
         alt.X('ocr_letters:O', sort='-y',title=ocr_title),
-        alt.Y("% of all OCR tokens:Q"),
+        yaxis,
             tooltip=[alt.Tooltip("pdf_letters:O",title=pdf_tag), 
                  alt.Tooltip("ocr_letters:O",title=ocr_tag), 
                  alt.Tooltip("name:N",title='Percentage'),
