@@ -2,6 +2,7 @@ import sys
 import pandas as pd
 import numpy as np
 import altair as alt
+import re
 
 def error_and_quit(message,ignore_quit=False,warn=True):
     if warn: print(message)
@@ -264,7 +265,8 @@ def return_matrix_chart_withHist(dfin,  dfin_larger, textsize=20, stroke='black'
                                 hist_location = 'right', 
                             legend_length = 200, legend_Y = -50,legend_direction='horizontal',
                                 color_selection = False,
-                                insert_delete_at_end = True):
+                                insert_delete_at_end = True, 
+                                labelFontSize=20,titleFontSize=20):
     
     # for colormap legend
     # legend placement
@@ -339,17 +341,22 @@ def return_matrix_chart_withHist(dfin,  dfin_larger, textsize=20, stroke='black'
     selector = alt.selection_point(encodings=['y'])#, init={pdf_letters:'A'})
     opacity = alt.condition(selector,alt.value(1),alt.value(0.25))
 
-
     if log:
         if not color_selection:
-            color = alt.Color(color_col+":Q", scale=alt.Scale(type='log',scheme=scheme,domain=[min_percent,100]),title=color_title,
+            color = alt.Color(color_col+":Q", 
+                              scale=alt.Scale(type='log',scheme=scheme,
+                                              domain=[min_percent,100]),
+                              title=color_title,
                               legend=alt.Legend(
                             orient='none',
                             legendX=legendX, legendY=legendY,
                             direction=legend_direction,
                             titleAnchor='middle', gradientLength=length))
         else:
-            color = alt.Color(color_col+":Q", scale=alt.Scale(type='log',scheme=scheme),title=color_title,
+            color = alt.Color(color_col+":Q", 
+                              scale=alt.Scale(type='log',
+                                              scheme=scheme),
+                              title=color_title,
                               legend=alt.Legend(
                             orient='none',
                             legendX=legendX, legendY=legendY,
@@ -357,14 +364,18 @@ def return_matrix_chart_withHist(dfin,  dfin_larger, textsize=20, stroke='black'
                             titleAnchor='middle', gradientLength=length))
     else:
         if not color_selection:
-            color = alt.Color(color_col+":Q", scale=alt.Scale(scheme=scheme,domain=[min_percent,100]),title=color_title,
+            color = alt.Color(color_col+":Q", 
+                              scale=alt.Scale(scheme=scheme,
+                                              domain=[min_percent,100]),
+                              title=color_title,
                               legend=alt.Legend(
                             orient='none',
                             legendX=legendX, legendY=legendY,
                             direction=legend_direction,
                             titleAnchor='middle', gradientLength=length))
         else:
-            color = alt.Color(color_col+":Q", scale=alt.Scale(scheme=scheme),title=color_title,
+            color = alt.Color(color_col+":Q", scale=alt.Scale(scheme=scheme),
+                              title=color_title,
                               legend=alt.Legend(
                             orient='none',
                             legendX=legendX, legendY=legendY,
@@ -432,12 +443,22 @@ def return_matrix_chart_withHist(dfin,  dfin_larger, textsize=20, stroke='black'
     )
 
     if hist_location == 'bottom':
-        chart = alt.vconcat(chart1, chart2, center=True)
+        chart = alt.vconcat(chart1, chart2, center=True).configure_axis(
+            labelFontSize=labelFontSize,
+            titleFontSize=titleFontSize
+        )
     elif hist_location == 'right':
-        chart = alt.hconcat(chart1,chart2,center=True)
+        chart = alt.hconcat(chart1,chart2,center=True).configure_axis(
+            labelFontSize=labelFontSize,
+            titleFontSize=titleFontSize
+        )
     else:
         print('not supported location for hist, will place on right')
-        chart = alt.hconcat(chart1,chart2,center=True)
+        chart = alt.hconcat(chart1,chart2,center=True).configure_axis(
+            labelFontSize=labelFontSize,
+            titleFontSize=titleFontSize
+        )
+        
 
     if return_sort_ocr:
         return chart, sort_ocr
