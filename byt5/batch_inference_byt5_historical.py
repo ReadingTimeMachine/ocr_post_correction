@@ -1,3 +1,5 @@
+restart = False # set to true to re-run everything, even if data is already there
+
 # ------- on home -------
 
 # # ----- just words --------
@@ -17,9 +19,9 @@ ender = '_full_large' # 100k for training, 5k val
 only_words = False
 
 # also, test with a model that has been trained on *just* the historical dataset
+# (this runs at the same time)
 output_dir_hist = '/Users/jnaiman/Downloads/tmp/byt5_ocr_full_hal_historical/' 
 # where to save everybody
-####output_dir_inf_hist = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/inferences/historical_histOnly/'
 snapshot_hist = 'checkpoint-160' # set to None to take last
 
 aligned_dataset_dir = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/alignments/'
@@ -36,6 +38,9 @@ imod = 10
 nProcs = 6
 
 special_char = ['\\%', '\\&']
+
+wait_timeout = 5.0 # timeout in minutes
+batch_size=100
 # -------------------------------------------------------------
 
 from torch import cuda
@@ -63,7 +68,6 @@ path.append(main_sanskrit_dir)
 
 from transformers import pipeline
 from tqdm import tqdm
-import time
 ##import glob
 from metrics import get_metric
 import subprocess
@@ -76,6 +80,7 @@ import numpy as np
 import time
 import re
 import signal
+import os
 
 
 from sys import path
@@ -283,12 +288,13 @@ class timeout:
 
         
 def store_file(fullpath, checkpoint, df_test, save_file=None, wait=2.0,
-              verbose=True): # timeout in minutes
+              verbose=True,batch_size=100): # timeout in minutes
     wait *= 60.0
     ocr_pipeline = pipeline(
         'text2text-generation',
         model = fullpath,
-        tokenizer=tokenizer)
+        tokenizer=tokenizer,
+    batch_size=batch_size)
 
     #print('Model Loaded')
     start = time.time()
@@ -322,12 +328,12 @@ def store_file(fullpath, checkpoint, df_test, save_file=None, wait=2.0,
 
 # this just uses a model
 def store_file_model(model, df_test, save_file=None, wait=2.0,
-              verbose=True): # timeout in minutes
+              verbose=True,batch_size=100): # timeout in minutes
     wait *= 60.0
     ocr_pipeline = pipeline(
         'text2text-generation',
         model = model,
-        tokenizer=tokenizer)
+        tokenizer=tokenizer,batch_size=batch_size)
 
     #print('Model Loaded')
     start = time.time()
@@ -516,6 +522,17 @@ start_time = time.time()
 
 my_storage = {}
 for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
+    fname_out = historical_gt[indd].split('.pickle')[0].split('/')[-1]
+    # check if we want to restart or not
+    goOn = True
+    if not restart: # not restarting, then check
+        if os.path.exists(output_dir_inf + fname_out + ender+'.csv'):
+            goOn = False
+    if not goOn:
+        continue
+            
+    #check_fle = output_dir_inf + dir_test['filename'] + ender+'.csv'
+    #import sys; sys.exit()
     
     filenames = []; pages = []; sents = []; 
     source = []; target = []
@@ -537,6 +554,7 @@ for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
         
     df_historical_test = df_historical_test_all.loc[df_historical_test_all['type'].isin(types)]
     if len(df_historical_test) == 0: # check if stuff in there
+        print('pass on this type:', types_here[0])
         continue
         
     if not only_words: # nothing fancy
@@ -678,9 +696,10 @@ for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
             print('input ocr    :', df_historical_test['input_text'].values[0])
             print('input target :', df_historical_test['target_text'].values[0])
         else:
+            print('inds is zero')
             continue
         
-
+    import sys; sys.exit()
 
     if indd%imod == 0:
         end_time = time.time()
@@ -692,28 +711,64 @@ for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
     #                            verbose = False)
     dfout_here,err = store_file(snapshot, ckpoint, 
                                 df_historical_test,
-                               verbose = False)
+                               verbose = False, wait=wait_timeout,
+                               batch_size=batch_size)
     dfout_here_hist,err_hist = store_file(snapshot_hist, ckpoint_hist, 
                                 df_historical_test,
-                               verbose = False)
+                               verbose = False, wait=wait_timeout,
+                               batch_size=batch_size)
     
     # with orig model
     dfout_here2,err2 = store_file_model(model, 
                                 df_historical_test,
-                               verbose = False)
+                               verbose = False, wait=wait_timeout,
+                               batch_size=batch_size)
     
-    if not err and not err2 and not err_hist:
-        df2 = df_historical_test.copy()
-        #print('predicted :', str(dfout_here['predicted_text'].values[0]))
-        #print('')
+    # check with all errors
+    df2 = df_historical_test.copy()
+    if not err: # no error in first
         df2['predicted_text'] = str(dfout_here['predicted_text'].values[0])
-        df2['predicted_text_defaultModel'] = str(dfout_here2['predicted_text'].values[0])
-        df2['predicted_text_histOnlyModel'] = str(dfout_here_hist['predicted_text'].values[0])
-        df2.to_csv(output_dir_inf + dir_test['filename'] + ender+'.csv', index=False)
+    else:
+        df2['predicted_text'] = np.nan
         
-        #if ('CL94' in dfout_here['predicted_text'].values[0]) and ('here is not the expansion velocity' not in dfout_here['target_text'].values[0]): 
-        #    import sys; sys.exit()
+    if not err_hist:
+        df2['predicted_text_histOnlyModel'] = str(dfout_here_hist['predicted_text'].values[0])
+    else:
+        df2['predicted_text_histOnlyModel'] = np.nan
+       
+    if not err2:
+        df2['predicted_text_defaultModel'] = str(dfout_here2['predicted_text'].values[0])
+    else:
+        df2['predicted_text_defaultModel'] = np.nan
+  
+    df2.to_csv(output_dir_inf + fname_out + ender+'.csv', index=False)
+
+    if err and err2 and err_hist:
+        print('timeouts for all:')
+        print('  input ocr    :', df_historical_test['input_text'].values[0])
+        print('  input target :', df_historical_test['target_text'].values[0])
+        print('')
+        
+        
+#     if not err and not err2 and not err_hist:
+#         df2 = df_historical_test.copy()
+#         #print('predicted :', str(dfout_here['predicted_text'].values[0]))
+#         #print('')
+#         df2['predicted_text'] = str(dfout_here['predicted_text'].values[0])
+#         df2['predicted_text_defaultModel'] = str(dfout_here2['predicted_text'].values[0])
+#         df2['predicted_text_histOnlyModel'] = str(dfout_here_hist['predicted_text'].values[0])
+#         df2.to_csv(output_dir_inf + fname_out + ender+'.csv', index=False)
+        
+#         #if ('CL94' in dfout_here['predicted_text'].values[0]) and ('here is not the expansion velocity' not in dfout_here['target_text'].values[0]): 
+#         #    import sys; sys.exit()
    
-        del df2
-        del dfout_here
-        del dfout_here2
+#         del df2
+#         del dfout_here
+#         del dfout_here2
+#     else: # time'd out!
+#         print('sentence timed out on is:')
+#         print('  input ocr    :', df_historical_test['input_text'].values[0])
+#         print('  input target :', df_historical_test['target_text'].values[0])
+#         print('')
+#         import sys; sys.exit()
+
