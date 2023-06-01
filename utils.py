@@ -515,3 +515,256 @@ def return_dropdown_hist(dfin_larger,
     )
     
     return chart2
+
+
+# to "fix" OCR (found and GT) for specific markers
+def fix_ocr(dfout_historical, 
+            marks={'citations':'↫','refs':'↷','inlines':'↭'}, 
+            predicted_text_col = 'predicted_text'):
+    dfout_err_h = dfout_historical.copy()
+
+    dfmask = []
+
+    cer_orig = []; wer_orig = []
+    cer_corr = []; wer_corr = []
+    cer_corr_fix = []; wer_corr_fix = []
+    cer_fix = []; wer_fix = []
+    pdf_fix_out = []; ocr_fix_out = []
+    for i in range(len(dfout_historical)):
+
+        ocr = dfout_historical.iloc[i]['input_text']
+        pdf = dfout_historical.iloc[i]['target_text']
+        ocr_corr = dfout_historical.iloc[i][predicted_text_col]
+
+ 
+        if pd.isnull(ocr) or pd.isnull(pdf) or pd.isnull(ocr_corr):
+            pdf_fix_out.append(np.nan)
+            ocr_fix_out.append(np.nan)
+            cer_orig.append(np.nan)
+            wer_orig.append(np.nan)
+            cer_corr.append(np.nan)
+            wer_corr.append(np.nan)
+            cer_corr_fix.append(np.nan)
+            wer_corr_fix.append(np.nan)
+            cer_fix.append(np.nan)
+            wer_fix.append(np.nan)
+            dfmask.append(False)
+            continue
+            
+        
+       # orig
+        ocr_orig = str(dfout_historical.iloc[i]['input_text'])
+        pdf_orig = str(dfout_historical.iloc[i]['target_text'])
+        ocr_corr_orig = str(dfout_historical.iloc[i]['predicted_text'])
+        
+        # count '$'
+        #pdf_orig = str(pdf_orig)
+        if list(pdf_orig).count('$')%2 != 0:
+            pdf_fix_out.append(np.nan)
+            ocr_fix_out.append(np.nan)
+            cer_orig.append(np.nan)
+            wer_orig.append(np.nan)
+            cer_corr.append(np.nan)
+            wer_corr.append(np.nan)
+            cer_corr_fix.append(np.nan)
+            wer_corr_fix.append(np.nan)
+            cer_fix.append(np.nan)
+            wer_fix.append(np.nan)
+            dfmask.append(False)
+            continue
+            # print('uneven $!')
+            # print(pdf_orig)
+            # import sys; sys.exit()
+
+
+            
+        # if not, format
+        ocr = str(ocr); pdf = str(pdf)
+        ocr_corr = str(ocr_corr)
+
+        # also, do with just taking out locations of citations, refs and inlines:
+        # ------ 1. inline math --------
+        ind = 0
+        pdf_fix = ''
+        while ind < len(pdf):
+            if '$' in pdf[ind:]:
+                i1 = pdf[ind:].index('$')
+                try:
+                    i2 = pdf[ind+i1+1:].index('$')+i1+1+1
+                    # find match
+                    pdf_fix += pdf[ind:ind+i1]
+                    pdf_fix += marks['inlines']
+                    #import sys; sys.exit()
+                    ind += i2
+                except:
+                    print('matching $ not found, moving on...')
+                    print('current:', pdf)
+                    print('prior:', pdf_orig)
+                    import sys; sys.exit()
+                    ind += i1
+            else:
+                pdf_fix += pdf[ind:]
+                ind += len(pdf[ind:])
+
+        ind = 0
+        ocr_corr_fix = ''
+        while ind < len(ocr_corr):
+            if '$' in ocr_corr[ind:]:
+                i1 = ocr_corr[ind:].index('$')
+                nope = False
+                try:
+                    i2 = ocr_corr[ind+i1+1:].index('$')+i1+1+1
+                except:
+                    print('no matching $ in OCR corrected fix!')
+                    nope = True
+                if not nope:
+                    # find match
+                    ocr_corr_fix += ocr_corr[ind:ind+i1]
+                    ocr_corr_fix += marks['inlines']
+                    #import sys; sys.exit()
+                    ind += i2
+                else:
+                    ind += i1+1
+            else:
+                ocr_corr_fix += ocr_corr[ind:]
+                ind += len(ocr_corr[ind:])
+
+        # ------ 2. citations -----
+        ind = 0
+        pdf_fix2 = ''
+        while ind < len(pdf_fix):
+            if '\\cite' in pdf_fix[ind:]:
+                ind1,ind2,err = spc(pdf_fix[ind:],function='\\cite',
+                        dopen='{',dclose='}',
+                       error_out=False)
+                if ind1 != -1 and ind2 != -2:
+                    pdf_fix2 += pdf_fix[ind:ind+ind1]
+                    pdf_fix2 += marks['citations']
+                    ind += ind2
+                else:
+                    ind += pdf_fix[ind:].index('\\cite')+len('\\cite')
+            else:
+                pdf_fix2 += pdf_fix[ind:]
+                ind += len(pdf_fix[ind:])
+
+        ind = 0
+        ocr_corr_fix2 = ''
+        while ind < len(ocr_corr_fix):
+            if '\\cite' in ocr_corr_fix[ind:]:
+                ind1,ind2,err = spc(ocr_corr_fix[ind:],function='\\cite',
+                        dopen='{',dclose='}',
+                       error_out=False)
+                if not err:
+                    ocr_corr_fix2 += ocr_corr_fix[ind:ind+ind1]
+                    ocr_corr_fix2 += marks['citations']
+                    ind += ind2
+                else:
+                    ind += ocr_corr_fix[ind:].index('\\cite')+len('\\cite')
+            else:
+                ocr_corr_fix2 += ocr_corr_fix[ind:]
+                ind += len(ocr_corr_fix[ind:])
+
+         # ------ 3. refs -----
+        ind = 0
+        pdf_fix3 = ''
+        while ind < len(pdf_fix2):
+            if '\\ref' in pdf_fix2[ind:]:
+                ind1,ind2 = spc(pdf_fix2[ind:],function='\\ref',
+                        dopen='{',dclose='}',
+                       error_out=True)
+                pdf_fix3 += pdf_fix2[ind:ind+ind1]
+                pdf_fix3 += marks['refs']
+                ind += ind2
+            else:
+                pdf_fix3 += pdf_fix2[ind:]
+                ind += len(pdf_fix2[ind:])
+
+        ind = 0
+        ocr_corr_fix3 = ''
+        while ind < len(ocr_corr_fix2):
+            if '\\ref' in ocr_corr_fix2[ind:]:
+                ind1,ind2 = spc(ocr_corr_fix2[ind:],function='\\ref',
+                        dopen='{',dclose='}',
+                       error_out=True)
+                ocr_corr_fix3 += ocr_corr_fix2[ind:ind+ind1]
+                ocr_corr_fix3 += marks['refs']
+                ind += ind2
+            else:
+                ocr_corr_fix3 += ocr_corr_fix2[ind:]
+                ind += len(ocr_corr_fix2[ind:])
+
+        #if i == 5: import sys; sys.exit()
+
+        # orig errors
+        cer_orig_here = fastwer.score_sent(ocr_orig,pdf_orig, 
+                                      char_level=True)
+        wer_orig_here = fastwer.score_sent(ocr_orig,pdf_orig, 
+                                      char_level=False)
+        # after correction
+        cer_corr_here = fastwer.score_sent(ocr_corr_orig,pdf_orig, 
+                                      char_level=True)
+        wer_corr_here = fastwer.score_sent(ocr_corr_orig,pdf_orig, 
+                                      char_level=False)
+
+        # after correction, with replacement
+        cer_corr_fix_here = fastwer.score_sent(ocr_corr_fix3,pdf_fix3, 
+                                      char_level=True)
+        wer_corr_fix_here = fastwer.score_sent(ocr_corr_fix3,pdf_fix3, 
+                                      char_level=False)
+
+        # before correction, with replacement
+        cer_fix_here = fastwer.score_sent(ocr,pdf_fix3, 
+                                      char_level=True)
+        wer_fix_here = fastwer.score_sent(ocr,pdf_fix3, 
+                                      char_level=False)
+
+
+        # ignore if we haven't checked for extra non-tracked things
+        pdf_check = pdf_fix3.replace('*','').replace('`','').replace('$','')
+        s = re.search(search_doc, pdf_check)
+        if s: # skip
+            pdf_fix_out.append(np.nan)
+            ocr_fix_out.append(np.nan)
+            cer_orig.append(np.nan)
+            wer_orig.append(np.nan)
+            cer_corr.append(np.nan)
+            wer_corr.append(np.nan)
+            cer_corr_fix.append(np.nan)
+            wer_corr_fix.append(np.nan)
+            cer_fix.append(np.nan)
+            wer_fix.append(np.nan)
+            dfmask.append(False)
+            continue
+        else:
+            dfmask.append(True)
+
+
+        pdf_fix_out.append(pdf_fix3)
+        ocr_fix_out.append(ocr_corr_fix3)
+
+
+        cer_orig.append(cer_orig_here)
+        wer_orig.append(wer_orig_here)
+        cer_corr.append(cer_corr_here)
+        wer_corr.append(wer_corr_here)
+        cer_corr_fix.append(cer_corr_fix_here)
+        wer_corr_fix.append(wer_corr_fix_here)
+        cer_fix.append(cer_fix_here)
+        wer_fix.append(wer_fix_here)
+
+    # recopy
+    #dfout_err_h = dfout_historical.copy().loc[dfmask]
+
+    dfout_err_h['CER Orig'] = cer_orig
+    dfout_err_h['WER Orig'] = wer_orig
+    dfout_err_h['CER Corrected'] = cer_corr
+    dfout_err_h['WER Corrected'] = wer_corr
+    dfout_err_h['CER Fix Corrected'] = cer_corr_fix
+    dfout_err_h['WER Fix Corrected'] = wer_corr_fix
+    dfout_err_h['CER Fix'] = cer_fix
+    dfout_err_h['WER Fix'] = wer_fix
+    dfout_err_h['target_text_fixed'] = pdf_fix_out
+    dfout_err_h['predicted_text_fixed'] = ocr_fix_out
+    dfout_err_h['masked entries'] = dfmask
+    
+    return dfout_err_h
