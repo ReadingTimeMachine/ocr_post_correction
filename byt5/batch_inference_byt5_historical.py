@@ -39,8 +39,12 @@ nProcs = 6
 
 special_char = ['\\%', '\\&']
 
-wait_timeout = 5.0 # timeout in minutes
-batch_size=100
+skip_specials = True
+verbose = True
+
+
+# wait_timeout = 5.0 # timeout in minutes
+# batch_size=100
 # -------------------------------------------------------------
 
 from torch import cuda
@@ -87,191 +91,191 @@ from sys import path
 path.append(library_dir)
 import Levenshtein
 from utils import split_function_with_delimiters_with_checks as spc
-from utils import get_fill_in_types, align_texts_fast
+from utils import get_fill_in_types, align_texts_fast, fix_ocr
 
 import yt
 yt.enable_parallelism()
 
 # -------------------------------------------------------------
 
-def fix_ocr(dfout_historical):
-    dfout_err_h = dfout_historical.copy()
+# def fix_ocr(dfout_historical):
+#     dfout_err_h = dfout_historical.copy()
 
-    dfmask = []
+#     dfmask = []
 
-    cer_orig = []; wer_orig = []
-    cer_corr = []; wer_corr = []
-    cer_corr_fix = []; wer_corr_fix = []
-    cer_fix = []; wer_fix = []
-    pdf_fix_out = []; ocr_fix_out = []
-    for i in range(len(dfout_historical)):
+#     cer_orig = []; wer_orig = []
+#     cer_corr = []; wer_corr = []
+#     cer_corr_fix = []; wer_corr_fix = []
+#     cer_fix = []; wer_fix = []
+#     pdf_fix_out = []; ocr_fix_out = []
+#     for i in range(len(dfout_historical)):
 
-        ocr = dfout_historical.iloc[i]['input_text']
-        pdf = dfout_historical.iloc[i]['target_text']
-        ocr_corr = dfout_historical.iloc[i]['predicted_text']
+#         ocr = dfout_historical.iloc[i]['input_text']
+#         pdf = dfout_historical.iloc[i]['target_text']
+#         ocr_corr = dfout_historical.iloc[i]['predicted_text']
 
-        # also, do with just taking out locations of citations, refs and inlines:
-        # ------ 1. inline math --------
-        ind = 0
-        pdf_fix = ''
-        while ind < len(pdf):
-            if '$' in pdf[ind:]:
-                i1 = pdf[ind:].index('$')
-                i2 = pdf[ind+i1+1:].index('$')+i1+1+1
-                # find match
-                pdf_fix += pdf[ind:ind+i1]
-                pdf_fix += '$'
-                #import sys; sys.exit()
-                ind += i2
-            else:
-                pdf_fix += pdf[ind:]
-                ind += len(pdf[ind:])
+#         # also, do with just taking out locations of citations, refs and inlines:
+#         # ------ 1. inline math --------
+#         ind = 0
+#         pdf_fix = ''
+#         while ind < len(pdf):
+#             if '$' in pdf[ind:]:
+#                 i1 = pdf[ind:].index('$')
+#                 i2 = pdf[ind+i1+1:].index('$')+i1+1+1
+#                 # find match
+#                 pdf_fix += pdf[ind:ind+i1]
+#                 pdf_fix += '$'
+#                 #import sys; sys.exit()
+#                 ind += i2
+#             else:
+#                 pdf_fix += pdf[ind:]
+#                 ind += len(pdf[ind:])
 
-        ind = 0
-        ocr_corr_fix = ''
-        while ind < len(ocr_corr):
-            if '$' in ocr_corr[ind:]:
-                i1 = ocr_corr[ind:].index('$')
-                nope = False
-                try:
-                    i2 = ocr_corr[ind+i1+1:].index('$')+i1+1+1
-                except:
-                    print('no matching $ in OCR corrected fix!')
-                    nope = True
-                if not nope:
-                    # find match
-                    ocr_corr_fix += ocr_corr[ind:ind+i1]
-                    ocr_corr_fix += '$'
-                    #import sys; sys.exit()
-                    ind += i2
-                else:
-                    ind += i1+1
-            else:
-                ocr_corr_fix += ocr_corr[ind:]
-                ind += len(ocr_corr[ind:])
+#         ind = 0
+#         ocr_corr_fix = ''
+#         while ind < len(ocr_corr):
+#             if '$' in ocr_corr[ind:]:
+#                 i1 = ocr_corr[ind:].index('$')
+#                 nope = False
+#                 try:
+#                     i2 = ocr_corr[ind+i1+1:].index('$')+i1+1+1
+#                 except:
+#                     print('no matching $ in OCR corrected fix!')
+#                     nope = True
+#                 if not nope:
+#                     # find match
+#                     ocr_corr_fix += ocr_corr[ind:ind+i1]
+#                     ocr_corr_fix += '$'
+#                     #import sys; sys.exit()
+#                     ind += i2
+#                 else:
+#                     ind += i1+1
+#             else:
+#                 ocr_corr_fix += ocr_corr[ind:]
+#                 ind += len(ocr_corr[ind:])
 
-        # ------ 2. citations -----
-        ind = 0
-        pdf_fix2 = ''
-        while ind < len(pdf_fix):
-            if '\\cite' in pdf_fix[ind:]:
-                ind1,ind2 = spc(pdf_fix[ind:],function='\\cite',
-                        dopen='{',dclose='}',
-                       error_out=True)
-                pdf_fix2 += pdf_fix[ind:ind+ind1]
-                pdf_fix2 += '`'
-                ind += ind2
-            else:
-                pdf_fix2 += pdf_fix[ind:]
-                ind += len(pdf_fix[ind:])
+#         # ------ 2. citations -----
+#         ind = 0
+#         pdf_fix2 = ''
+#         while ind < len(pdf_fix):
+#             if '\\cite' in pdf_fix[ind:]:
+#                 ind1,ind2 = spc(pdf_fix[ind:],function='\\cite',
+#                         dopen='{',dclose='}',
+#                        error_out=True)
+#                 pdf_fix2 += pdf_fix[ind:ind+ind1]
+#                 pdf_fix2 += '`'
+#                 ind += ind2
+#             else:
+#                 pdf_fix2 += pdf_fix[ind:]
+#                 ind += len(pdf_fix[ind:])
 
-        ind = 0
-        ocr_corr_fix2 = ''
-        while ind < len(ocr_corr_fix):
-            if '\\cite' in ocr_corr_fix[ind:]:
-                ind1,ind2 = spc(ocr_corr_fix[ind:],function='\\cite',
-                        dopen='{',dclose='}',
-                       error_out=True)
-                ocr_corr_fix2 += ocr_corr_fix[ind:ind+ind1]
-                ocr_corr_fix2 += '`'
-                ind += ind2
-            else:
-                ocr_corr_fix2 += ocr_corr_fix[ind:]
-                ind += len(ocr_corr_fix[ind:])
+#         ind = 0
+#         ocr_corr_fix2 = ''
+#         while ind < len(ocr_corr_fix):
+#             if '\\cite' in ocr_corr_fix[ind:]:
+#                 ind1,ind2 = spc(ocr_corr_fix[ind:],function='\\cite',
+#                         dopen='{',dclose='}',
+#                        error_out=True)
+#                 ocr_corr_fix2 += ocr_corr_fix[ind:ind+ind1]
+#                 ocr_corr_fix2 += '`'
+#                 ind += ind2
+#             else:
+#                 ocr_corr_fix2 += ocr_corr_fix[ind:]
+#                 ind += len(ocr_corr_fix[ind:])
 
-         # ------ 3. refs -----
-        ind = 0
-        pdf_fix3 = ''
-        while ind < len(pdf_fix2):
-            if '\\ref' in pdf_fix2[ind:]:
-                ind1,ind2 = spc(pdf_fix2[ind:],function='\\ref',
-                        dopen='{',dclose='}',
-                       error_out=True)
-                pdf_fix3 += pdf_fix2[ind:ind+ind1]
-                pdf_fix3 += '*'
-                ind += ind2
-            else:
-                pdf_fix3 += pdf_fix2[ind:]
-                ind += len(pdf_fix2[ind:])
+#          # ------ 3. refs -----
+#         ind = 0
+#         pdf_fix3 = ''
+#         while ind < len(pdf_fix2):
+#             if '\\ref' in pdf_fix2[ind:]:
+#                 ind1,ind2 = spc(pdf_fix2[ind:],function='\\ref',
+#                         dopen='{',dclose='}',
+#                        error_out=True)
+#                 pdf_fix3 += pdf_fix2[ind:ind+ind1]
+#                 pdf_fix3 += '*'
+#                 ind += ind2
+#             else:
+#                 pdf_fix3 += pdf_fix2[ind:]
+#                 ind += len(pdf_fix2[ind:])
 
-        ind = 0
-        ocr_corr_fix3 = ''
-        while ind < len(ocr_corr_fix2):
-            if '\\ref' in ocr_corr_fix2[ind:]:
-                ind1,ind2 = spc(ocr_corr_fix2[ind:],function='\\ref',
-                        dopen='{',dclose='}',
-                       error_out=True)
-                ocr_corr_fix3 += ocr_corr_fix2[ind:ind+ind1]
-                ocr_corr_fix3 += '*'
-                ind += ind2
-            else:
-                ocr_corr_fix3 += ocr_corr_fix2[ind:]
-                ind += len(ocr_corr_fix2[ind:])
+#         ind = 0
+#         ocr_corr_fix3 = ''
+#         while ind < len(ocr_corr_fix2):
+#             if '\\ref' in ocr_corr_fix2[ind:]:
+#                 ind1,ind2 = spc(ocr_corr_fix2[ind:],function='\\ref',
+#                         dopen='{',dclose='}',
+#                        error_out=True)
+#                 ocr_corr_fix3 += ocr_corr_fix2[ind:ind+ind1]
+#                 ocr_corr_fix3 += '*'
+#                 ind += ind2
+#             else:
+#                 ocr_corr_fix3 += ocr_corr_fix2[ind:]
+#                 ind += len(ocr_corr_fix2[ind:])
 
-        #if i == 5: import sys; sys.exit()
+#         #if i == 5: import sys; sys.exit()
 
-        # orig errors
-        cer_orig_here = fastwer.score_sent(ocr,pdf, 
-                                      char_level=True)
-        wer_orig_here = fastwer.score_sent(ocr,pdf, 
-                                      char_level=False)
-        # after correction
-        cer_corr_here = fastwer.score_sent(ocr_corr,pdf, 
-                                      char_level=True)
-        wer_corr_here = fastwer.score_sent(ocr_corr,pdf, 
-                                      char_level=False)
+#         # orig errors
+#         cer_orig_here = fastwer.score_sent(ocr,pdf, 
+#                                       char_level=True)
+#         wer_orig_here = fastwer.score_sent(ocr,pdf, 
+#                                       char_level=False)
+#         # after correction
+#         cer_corr_here = fastwer.score_sent(ocr_corr,pdf, 
+#                                       char_level=True)
+#         wer_corr_here = fastwer.score_sent(ocr_corr,pdf, 
+#                                       char_level=False)
 
-        # after correction, with replacement
-        cer_corr_fix_here = fastwer.score_sent(ocr_corr_fix3,pdf_fix3, 
-                                      char_level=True)
-        wer_corr_fix_here = fastwer.score_sent(ocr_corr_fix3,pdf_fix3, 
-                                      char_level=False)
+#         # after correction, with replacement
+#         cer_corr_fix_here = fastwer.score_sent(ocr_corr_fix3,pdf_fix3, 
+#                                       char_level=True)
+#         wer_corr_fix_here = fastwer.score_sent(ocr_corr_fix3,pdf_fix3, 
+#                                       char_level=False)
 
-        # before correction, with replacement
-        cer_fix_here = fastwer.score_sent(ocr,pdf_fix3, 
-                                      char_level=True)
-        wer_fix_here = fastwer.score_sent(ocr,pdf_fix3, 
-                                      char_level=False)
-
-
-        # ignore if we haven't checked for extra non-tracked things
-        pdf_check = pdf_fix3.replace('*','').replace('`','').replace('$','')
-        s = re.search(search_doc, pdf_check)
-        if s: # skip
-            dfmask.append(False)
-            continue
-        else:
-            dfmask.append(True)
+#         # before correction, with replacement
+#         cer_fix_here = fastwer.score_sent(ocr,pdf_fix3, 
+#                                       char_level=True)
+#         wer_fix_here = fastwer.score_sent(ocr,pdf_fix3, 
+#                                       char_level=False)
 
 
-        pdf_fix_out.append(pdf_fix3)
-        ocr_fix_out.append(ocr_corr_fix3)
+#         # ignore if we haven't checked for extra non-tracked things
+#         pdf_check = pdf_fix3.replace('*','').replace('`','').replace('$','')
+#         s = re.search(search_doc, pdf_check)
+#         if s: # skip
+#             dfmask.append(False)
+#             continue
+#         else:
+#             dfmask.append(True)
 
 
-        cer_orig.append(cer_orig_here)
-        wer_orig.append(wer_orig_here)
-        cer_corr.append(cer_corr_here)
-        wer_corr.append(wer_corr_here)
-        cer_corr_fix.append(cer_corr_fix_here)
-        wer_corr_fix.append(wer_corr_fix_here)
-        cer_fix.append(cer_fix_here)
-        wer_fix.append(wer_fix_here)
+#         pdf_fix_out.append(pdf_fix3)
+#         ocr_fix_out.append(ocr_corr_fix3)
 
-    # recopy
-    dfout_err_h = dfout_historical.copy().loc[dfmask]
 
-    dfout_err_h['CER Orig'] = cer_orig
-    dfout_err_h['WER Orig'] = wer_orig
-    dfout_err_h['CER Corrected'] = cer_corr
-    dfout_err_h['WER Corrected'] = wer_corr
-    dfout_err_h['CER Fix Corrected'] = cer_corr_fix
-    dfout_err_h['WER Fix Corrected'] = wer_corr_fix
-    dfout_err_h['CER Fix'] = cer_fix
-    dfout_err_h['WER Fix'] = wer_fix
-    dfout_err_h['target_text_fixed'] = pdf_fix_out
-    dfout_err_h['predicted_text_fixed'] = ocr_fix_out
+#         cer_orig.append(cer_orig_here)
+#         wer_orig.append(wer_orig_here)
+#         cer_corr.append(cer_corr_here)
+#         wer_corr.append(wer_corr_here)
+#         cer_corr_fix.append(cer_corr_fix_here)
+#         wer_corr_fix.append(wer_corr_fix_here)
+#         cer_fix.append(cer_fix_here)
+#         wer_fix.append(wer_fix_here)
+
+#     # recopy
+#     dfout_err_h = dfout_historical.copy().loc[dfmask]
+
+#     dfout_err_h['CER Orig'] = cer_orig
+#     dfout_err_h['WER Orig'] = wer_orig
+#     dfout_err_h['CER Corrected'] = cer_corr
+#     dfout_err_h['WER Corrected'] = wer_corr
+#     dfout_err_h['CER Fix Corrected'] = cer_corr_fix
+#     dfout_err_h['WER Fix Corrected'] = wer_corr_fix
+#     dfout_err_h['CER Fix'] = cer_fix
+#     dfout_err_h['WER Fix'] = wer_fix
+#     dfout_err_h['target_text_fixed'] = pdf_fix_out
+#     dfout_err_h['predicted_text_fixed'] = ocr_fix_out
     
-    return dfout_err_h
+#     return dfout_err_h
 
 
 class timeout:
@@ -287,104 +291,104 @@ class timeout:
         signal.alarm(0)
 
         
-def store_file(fullpath, checkpoint, df_test, save_file=None, wait=2.0,
-              verbose=True,batch_size=100): # timeout in minutes
-    wait *= 60.0
-    ocr_pipeline = pipeline(
-        'text2text-generation',
-        model = fullpath,
-        tokenizer=tokenizer,
-    batch_size=batch_size)
+# def store_file(fullpath, checkpoint, df_test, save_file=None, wait=2.0,
+#               verbose=True,batch_size=100): # timeout in minutes
+#     wait *= 60.0
+#     ocr_pipeline = pipeline(
+#         'text2text-generation',
+#         model = fullpath,
+#         tokenizer=tokenizer,
+#     batch_size=batch_size)
 
-    #print('Model Loaded')
-    start = time.time()
-    #print('Time is ', start)
-    results = [] 
-    data = list(df_test.input_text.values)
-    err = False
-    try:
-        with timeout(seconds=int(wait)):
-            results = ocr_pipeline(data)
+#     #print('Model Loaded')
+#     start = time.time()
+#     #print('Time is ', start)
+#     results = [] 
+#     data = list(df_test.input_text.values)
+#     err = False
+#     try:
+#         with timeout(seconds=int(wait)):
+#             results = ocr_pipeline(data)
 
-        if verbose: print('Total time taken to process is ', round(time.time()-start,2), 'seconds')
-        pred_resultz = []
-        for i in list(range(len(results))):
-            for k,e in results[i].items():
-                pred_resultz.append(e)
+#         if verbose: print('Total time taken to process is ', round(time.time()-start,2), 'seconds')
+#         pred_resultz = []
+#         for i in list(range(len(results))):
+#             for k,e in results[i].items():
+#                 pred_resultz.append(e)
 
-        res = pd.DataFrame(zip(df_test.input_text.values,
-                               df_test.target_text.values,
-                               pred_resultz),columns = ['input_text','target_text','predicted_text'])
+#         res = pd.DataFrame(zip(df_test.input_text.values,
+#                                df_test.target_text.values,
+#                                pred_resultz),columns = ['input_text','target_text','predicted_text'])
 
-    except:
-        print('Timeout it is then...')
-        res = pd.DataFrame({'input_text':[],'target_text':[],'predicted_text':[]})
-        err = True
+#     except:
+#         print('Timeout it is then...')
+#         res = pd.DataFrame({'input_text':[],'target_text':[],'predicted_text':[]})
+#         err = True
         
-    if save_file is not None:
-        res.to_csv(save_file,index = False,sep=';')
+#     if save_file is not None:
+#         res.to_csv(save_file,index = False,sep=';')
 
-    return res, err
+#     return res, err
 
-# this just uses a model
-def store_file_model(model, df_test, save_file=None, wait=2.0,
-              verbose=True,batch_size=100): # timeout in minutes
-    wait *= 60.0
-    ocr_pipeline = pipeline(
-        'text2text-generation',
-        model = model,
-        tokenizer=tokenizer,batch_size=batch_size)
+# # this just uses a model
+# def store_file_model(model, df_test, save_file=None, wait=2.0,
+#               verbose=True,batch_size=100): # timeout in minutes
+#     wait *= 60.0
+#     ocr_pipeline = pipeline(
+#         'text2text-generation',
+#         model = model,
+#         tokenizer=tokenizer,batch_size=batch_size)
 
-    #print('Model Loaded')
-    start = time.time()
-    #print('Time is ', start)
-    results = [] 
-    data = list(df_test.input_text.values)
-    err = False
-    try:
-        with timeout(seconds=int(wait)):
-            results = ocr_pipeline(data)
+#     #print('Model Loaded')
+#     start = time.time()
+#     #print('Time is ', start)
+#     results = [] 
+#     data = list(df_test.input_text.values)
+#     err = False
+#     try:
+#         with timeout(seconds=int(wait)):
+#             results = ocr_pipeline(data)
 
-        if verbose: print('Total time taken to process is ', round(time.time()-start,2), 'seconds')
-        pred_resultz = []
-        for i in list(range(len(results))):
-            for k,e in results[i].items():
-                pred_resultz.append(e)
+#         if verbose: print('Total time taken to process is ', round(time.time()-start,2), 'seconds')
+#         pred_resultz = []
+#         for i in list(range(len(results))):
+#             for k,e in results[i].items():
+#                 pred_resultz.append(e)
 
-        res = pd.DataFrame(zip(df_test.input_text.values,
-                               df_test.target_text.values,
-                               pred_resultz),columns = ['input_text','target_text','predicted_text'])
+#         res = pd.DataFrame(zip(df_test.input_text.values,
+#                                df_test.target_text.values,
+#                                pred_resultz),columns = ['input_text','target_text','predicted_text'])
 
-    except:
-        print('Timeout it is then...')
-        res = pd.DataFrame({'input_text':[],'target_text':[],'predicted_text':[]})
-        err = True
+#     except:
+#         print('Timeout it is then...')
+#         res = pd.DataFrame({'input_text':[],'target_text':[],'predicted_text':[]})
+#         err = True
         
-    if save_file is not None:
-        res.to_csv(save_file,index = False,sep=';')
+#     if save_file is not None:
+#         res.to_csv(save_file,index = False,sep=';')
 
-    return res, err
+#     return res, err
 
-class GPReviewDataset(Dataset):
-    def __init__(self, Text, Label):
-        self.Text = Text
-        self.Label = Label
-        # self.tokenizer = tokenizer
-        # self.max_len = max_len
-    def __len__(self):
-        return len(self.Text)
-    def __getitem__(self, item):
-        Text = str(self.Text[item])
-        Label = self.Label[item]
-        inputs = tokenizer(Text, padding="max_length", truncation=True, max_length=512)
-        outputs = tokenizer(Label, padding="max_length", truncation=True, max_length=512)
-        return {
-          "input_ids":inputs.input_ids,
-          "attention_mask" : inputs.attention_mask,
-          "labels" : outputs.input_ids,
-          "decoder_attention_mask" : outputs.attention_mask,
-          # "labels" : lbz
-        }
+# class GPReviewDataset(Dataset):
+#     def __init__(self, Text, Label):
+#         self.Text = Text
+#         self.Label = Label
+#         # self.tokenizer = tokenizer
+#         # self.max_len = max_len
+#     def __len__(self):
+#         return len(self.Text)
+#     def __getitem__(self, item):
+#         Text = str(self.Text[item])
+#         Label = self.Label[item]
+#         inputs = tokenizer(Text, padding="max_length", truncation=True, max_length=512)
+#         outputs = tokenizer(Label, padding="max_length", truncation=True, max_length=512)
+#         return {
+#           "input_ids":inputs.input_ids,
+#           "attention_mask" : inputs.attention_mask,
+#           "labels" : outputs.input_ids,
+#           "decoder_attention_mask" : outputs.attention_mask,
+#           # "labels" : lbz
+#         }
     
     
 def add_formatted_columns(datain):
@@ -429,38 +433,38 @@ def add_formatted_columns(datain):
 # test_df = test_df.rename(columns={"sentences source": "input_text", 
 #                         "sentences target": "target_text"})
 
-args_dict = {
-    #"model_name_or_path": 'google/byt5-small',
-    #"max_len": 4096,
-    #"max_length": 4096,
-    "output_dir": output_dir,
-    "overwrite_output_dir": True,
-    "per_device_train_batch_size": 4,
-    "per_device_eval_batch_size": 4,
-    "gradient_accumulation_steps": 4,
-    "learning_rate": 5e-4,
-    "warmup_steps": 250,
-    "logging_steps": 100,
-    "evaluation_strategy": "steps",
-    "eval_steps": 1000,
-    "num_train_epochs": 4,
-    "do_train": True,
-    "do_eval": True,
-    "fp16": False,
-    #"use_cache": False,
-    "max_steps": 100000,
-    'save_steps':1000,
-    'save_strategy':'steps',
-    # 'load_best_model_at_end': True,
-    # 'metric_for_best_model':'eval_loss',
-    # 'greater_is_better':False
-}
+# args_dict = {
+#     #"model_name_or_path": 'google/byt5-small',
+#     #"max_len": 4096,
+#     #"max_length": 4096,
+#     "output_dir": output_dir,
+#     "overwrite_output_dir": True,
+#     "per_device_train_batch_size": 4,
+#     "per_device_eval_batch_size": 4,
+#     "gradient_accumulation_steps": 4,
+#     "learning_rate": 5e-4,
+#     "warmup_steps": 250,
+#     "logging_steps": 100,
+#     "evaluation_strategy": "steps",
+#     "eval_steps": 1000,
+#     "num_train_epochs": 4,
+#     "do_train": True,
+#     "do_eval": True,
+#     "fp16": False,
+#     #"use_cache": False,
+#     "max_steps": 100000,
+#     'save_steps':1000,
+#     'save_strategy':'steps',
+#     # 'load_best_model_at_end': True,
+#     # 'metric_for_best_model':'eval_loss',
+#     # 'greater_is_better':False
+# }
 
-parser = HfArgumentParser(
-        (TrainingArguments))
-training_args = parser.parse_dict(args_dict)
-# set_seed(training_args.seed)
-args = training_args[0]
+# parser = HfArgumentParser(
+#         (TrainingArguments))
+# training_args = parser.parse_dict(args_dict)
+# # set_seed(training_args.seed)
+# args = training_args[0]
 
 # Load pretrained model and tokenizer
 tokenizer = AutoTokenizer.from_pretrained(
@@ -517,6 +521,10 @@ inds = np.arange(0,len(historical_gt))
 # debug
 #inds = inds[:12]
 #imod = 2
+
+# load all models, replace orig
+model = T5ForConditionalGeneration.from_pretrained(snapshot)
+model_hist = T5ForConditionalGeneration.from_pretrained(snapshot_hist)
 
 start_time = time.time()
 
@@ -699,76 +707,79 @@ for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
             print('inds is zero')
             continue
         
-    import sys; sys.exit()
 
     if indd%imod == 0:
         end_time = time.time()
         print('on', indd, 'of', len(inds),'in', end_time-start_time, 'seconds, or',
              (end_time-start_time)/60., 'minutes')
         start_time = time.time()
-    # dfout_here,err = store_file(snapshot, ckpoint, 
-    #                             test_df.iloc[ind].to_frame().T,
-    #                            verbose = False)
-    dfout_here,err = store_file(snapshot, ckpoint, 
-                                df_historical_test,
-                               verbose = False, wait=wait_timeout,
-                               batch_size=batch_size)
-    dfout_here_hist,err_hist = store_file(snapshot_hist, ckpoint_hist, 
-                                df_historical_test,
-                               verbose = False, wait=wait_timeout,
-                               batch_size=batch_size)
+        
+#     dfout_here,err = store_file(snapshot, ckpoint, 
+#                                 df_historical_test,
+#                                verbose = False, wait=wait_timeout,
+#                                batch_size=batch_size)
+#     dfout_here_hist,err_hist = store_file(snapshot_hist, ckpoint_hist, 
+#                                 df_historical_test,
+#                                verbose = False, wait=wait_timeout,
+#                                batch_size=batch_size)
     
-    # with orig model
-    dfout_here2,err2 = store_file_model(model, 
-                                df_historical_test,
-                               verbose = False, wait=wait_timeout,
-                               batch_size=batch_size)
+#     # with orig model
+#     dfout_here2,err2 = store_file_model(model, 
+#                                 df_historical_test,
+#                                verbose = False, wait=wait_timeout,
+#                                batch_size=batch_size)
+
+    err = False
+    err_hist = False
+    
+    text = df_historical_test.iloc[0]['input_text']
+    if verbose:
+        print('i=', indd)
+        print('input text                    :', text)
+        print('target text                   :', df_historical_test.iloc[0]['target_text'])
+    # base model
+    try:
+        inputs = tokenizer(text, padding="longest", return_tensors="pt")
+        output = model.generate(**inputs)
+        output_text = tokenizer.decode(output[0], 
+                                       skip_special_tokens=skip_specials, 
+                                       clean_up_tokenization_spaces=True)
+        if verbose:
+            print('default model predicted   :', output_text)
+        
+    except:
+        print('error in base model')
+        err = True
+        
+    # historical model
+    try:
+        inputs = tokenizer(text, padding="longest", return_tensors="pt")
+        output = model_hist.generate(**inputs)
+        output_text_hist = tokenizer.decode(output[0], 
+                                       skip_special_tokens=skip_specials, 
+                                       clean_up_tokenization_spaces=True)
+        if verbose:
+            print('historical model predicted:', output_text_hist)
+    except:
+        print('error in historical model')
+        err = True
+        
+
     
     # check with all errors
     df2 = df_historical_test.copy()
     if not err: # no error in first
-        df2['predicted_text'] = str(dfout_here['predicted_text'].values[0])
+        df2['predicted_text'] = str(output_text)
     else:
         df2['predicted_text'] = np.nan
         
     if not err_hist:
-        df2['predicted_text_histOnlyModel'] = str(dfout_here_hist['predicted_text'].values[0])
+        df2['predicted_text_histOnlyModel'] = str(output_text_hist)
     else:
         df2['predicted_text_histOnlyModel'] = np.nan
-       
-    if not err2:
-        df2['predicted_text_defaultModel'] = str(dfout_here2['predicted_text'].values[0])
-    else:
-        df2['predicted_text_defaultModel'] = np.nan
-  
+         
     df2.to_csv(output_dir_inf + fname_out + ender+'.csv', index=False)
+        
+        
 
-    if err and err2 and err_hist:
-        print('timeouts for all:')
-        print('  input ocr    :', df_historical_test['input_text'].values[0])
-        print('  input target :', df_historical_test['target_text'].values[0])
-        print('')
-        
-        
-#     if not err and not err2 and not err_hist:
-#         df2 = df_historical_test.copy()
-#         #print('predicted :', str(dfout_here['predicted_text'].values[0]))
-#         #print('')
-#         df2['predicted_text'] = str(dfout_here['predicted_text'].values[0])
-#         df2['predicted_text_defaultModel'] = str(dfout_here2['predicted_text'].values[0])
-#         df2['predicted_text_histOnlyModel'] = str(dfout_here_hist['predicted_text'].values[0])
-#         df2.to_csv(output_dir_inf + fname_out + ender+'.csv', index=False)
-        
-#         #if ('CL94' in dfout_here['predicted_text'].values[0]) and ('here is not the expansion velocity' not in dfout_here['target_text'].values[0]): 
-#         #    import sys; sys.exit()
-   
-#         del df2
-#         del dfout_here
-#         del dfout_here2
-#     else: # time'd out!
-#         print('sentence timed out on is:')
-#         print('  input ocr    :', df_historical_test['input_text'].values[0])
-#         print('  input target :', df_historical_test['target_text'].values[0])
-#         print('')
-#         import sys; sys.exit()
 
