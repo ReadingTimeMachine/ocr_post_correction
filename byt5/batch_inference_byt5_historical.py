@@ -733,36 +733,64 @@ for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
     err_hist = False
     
     text = df_historical_test.iloc[0]['input_text']
+    verbose_message = ''
     if verbose:
-        print('i=', indd)
-        print('input text                    :', text)
-        print('target text                   :', df_historical_test.iloc[0]['target_text'])
+        verbose_message += 'i='+str(indd) + '\n'
+        verbose_message += 'input text                : '+ text + '\n'
+        verbose_message += 'target text               : '+ df_historical_test.iloc[0]['target_text'] + '\n'
     # base model
+    
+#     try:
+#         with timeout(seconds=int(wait)):
+#             results = ocr_pipeline(data)
+
+#         if verbose: print('Total time taken to process is ', round(time.time()-start,2), 'seconds')
+#         pred_resultz = []
+#         for i in list(range(len(results))):
+#             for k,e in results[i].items():
+#                 pred_resultz.append(e)
+
+#         res = pd.DataFrame(zip(df_test.input_text.values,
+#                                df_test.target_text.values,
+#                                pred_resultz),columns = ['input_text','target_text','predicted_text'])
+
+#     except:
+#         print('Timeout it is then...')
+#         res = pd.DataFrame({'input_text':[],'target_text':[],'predicted_text':[]})
+#         err = True
+    
+
     try:
-        inputs = tokenizer(text, padding="longest", return_tensors="pt")
-        output = model.generate(**inputs)
-        output_text = tokenizer.decode(output[0], 
-                                       skip_special_tokens=skip_specials, 
-                                       clean_up_tokenization_spaces=True)
-        if verbose:
-            print('default model predicted   :', output_text)
+        with timeout(seconds=int(wait)):
+            inputs = tokenizer(text, padding="longest", return_tensors="pt")
+            output = model.generate(**inputs)
+            output_text = tokenizer.decode(output[0], 
+                                           skip_special_tokens=skip_specials, 
+                                           clean_up_tokenization_spaces=True)
+            if verbose:
+                verbose_message += 'default model predicted   : '+ output_text + '\n'
         
     except:
-        print('error in base model')
+        print(indd, ': error or timeout in base model')
         err = True
         
     # historical model
     try:
-        inputs = tokenizer(text, padding="longest", return_tensors="pt")
-        output = model_hist.generate(**inputs)
-        output_text_hist = tokenizer.decode(output[0], 
-                                       skip_special_tokens=skip_specials, 
-                                       clean_up_tokenization_spaces=True)
-        if verbose:
-            print('historical model predicted:', output_text_hist)
+        with timeout(seconds=int(wait)):
+            inputs = tokenizer(text, padding="longest", return_tensors="pt")
+            output = model_hist.generate(**inputs)
+            output_text_hist = tokenizer.decode(output[0], 
+                                           skip_special_tokens=skip_specials, 
+                                           clean_up_tokenization_spaces=True)
+            if verbose:
+                verbose_message += 'historical model predicted: '+ output_text_hist + '\n'
     except:
-        print('error in historical model')
+        print(indd, ': error or timeout in historical model')
         err = True
+        
+    if verbose:
+        verbose_message += '\n'
+        print(verbose_message)
         
 
     
