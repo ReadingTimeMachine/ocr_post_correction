@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import altair as alt
 import re
+import fastwer
 
 def error_and_quit(message,ignore_quit=False,warn=True):
     if warn: print(message)
@@ -520,7 +521,8 @@ def return_dropdown_hist(dfin_larger,
 # to "fix" OCR (found and GT) for specific markers
 def fix_ocr(dfout_historical, 
             marks={'citations':'↫','refs':'↷','inlines':'↭'}, 
-            predicted_text_col = 'predicted_text'):
+            predicted_text_col = 'predicted_text',
+           search_doc = r"\\(?:[^a-zA-Z]|[a-zA-Z]+[*=']?)"):
     dfout_err_h = dfout_historical.copy()
 
     dfmask = []
@@ -634,7 +636,7 @@ def fix_ocr(dfout_historical,
         pdf_fix2 = ''
         while ind < len(pdf_fix):
             if '\\cite' in pdf_fix[ind:]:
-                ind1,ind2,err = spc(pdf_fix[ind:],function='\\cite',
+                ind1,ind2,err = split_function_with_delimiters_with_checks(pdf_fix[ind:],function='\\cite',
                         dopen='{',dclose='}',
                        error_out=False)
                 if ind1 != -1 and ind2 != -2:
@@ -651,7 +653,7 @@ def fix_ocr(dfout_historical,
         ocr_corr_fix2 = ''
         while ind < len(ocr_corr_fix):
             if '\\cite' in ocr_corr_fix[ind:]:
-                ind1,ind2,err = spc(ocr_corr_fix[ind:],function='\\cite',
+                ind1,ind2,err = split_function_with_delimiters_with_checks(ocr_corr_fix[ind:],function='\\cite',
                         dopen='{',dclose='}',
                        error_out=False)
                 if not err:
@@ -669,7 +671,7 @@ def fix_ocr(dfout_historical,
         pdf_fix3 = ''
         while ind < len(pdf_fix2):
             if '\\ref' in pdf_fix2[ind:]:
-                ind1,ind2 = spc(pdf_fix2[ind:],function='\\ref',
+                ind1,ind2 = split_function_with_delimiters_with_checks(pdf_fix2[ind:],function='\\ref',
                         dopen='{',dclose='}',
                        error_out=True)
                 pdf_fix3 += pdf_fix2[ind:ind+ind1]
@@ -683,7 +685,7 @@ def fix_ocr(dfout_historical,
         ocr_corr_fix3 = ''
         while ind < len(ocr_corr_fix2):
             if '\\ref' in ocr_corr_fix2[ind:]:
-                ind1,ind2 = spc(ocr_corr_fix2[ind:],function='\\ref',
+                ind1,ind2 = split_function_with_delimiters_with_checks(ocr_corr_fix2[ind:],function='\\ref',
                         dopen='{',dclose='}',
                        error_out=True)
                 ocr_corr_fix3 += ocr_corr_fix2[ind:ind+ind1]

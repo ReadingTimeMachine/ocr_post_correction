@@ -1,16 +1,23 @@
-# ------- on home -------
-output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref_large/' # math/cite/refs -- just left in as raw
-# names of the tex latex file
-test_latex = 'test_masked_n10000_20230503.csv'
-only_words = False
-ender = '_full_large'
-snapshot = 'checkpoint-87000'
+# # ------- on home -------
+# output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref_large/' # math/cite/refs -- just left in as raw
+# # where to save everybody
+# output_dir_inf = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/inferences/latex_full/'
+# # names of the tex latex file
+# test_latex = 'test_masked_n10000_20230503.csv'
+# only_words = False
+# ender = '_full_large'
+# snapshot = 'checkpoint-87000'
 
-# output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref_small_words/' # this is just the words
-# test_latex = 'test_masked_n5000_20230510.csv'
-# only_words = True
-# ender = '_small_words' # 100k for training, 5k val
-# snapshot = 'checkpoint-31000' # set to None to take last
+output_dir = '/Users/jnaiman/Downloads/tmp/byt5_inline_cite_ref_small_words/' # this is just the words
+#where to save everybody
+output_dir_inf = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/inferences/latex/'
+test_latex = 'test_masked_n5000_20230510.csv'
+only_words = True
+ender = '_small_words' # 100k for training, 5k val
+snapshot = 'checkpoint-31000' # set to None to take last
+
+skip_specials = True
+wait_timeout = 2.0 # timeout in minutes
 
 # --------------------------------------------
 
@@ -19,8 +26,6 @@ aligned_dataset_dir = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrec
 main_sanskrit_dir = '/Users/jnaiman/pe-ocr-sanskrit/' # should change this
 library_dir = '../'
 
-# where to save everybody
-output_dir_inf = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/inferences/latex_full/'
 
 imod = 100
 
@@ -80,192 +85,216 @@ reload(utils)
 import utils
 
 from utils import split_function_with_delimiters_with_checks as spc
-from utils import get_fill_in_types
+from utils import get_fill_in_types, fix_ocr
 
 
 import yt
 yt.enable_parallelism()
 
+# logging
+import logging
 # -------------------------------------------------------------
 
-def fix_ocr(dfout_historical):
-    dfout_err_h = dfout_historical.copy()
+# To control logging level for various modules used in the application:
+import logging
+import re
+def set_global_logging_level(level=logging.ERROR, prefices=[""]):
+    """
+    Override logging levels of different modules based on their name as a prefix.
+    It needs to be invoked after the modules have been loaded so that their loggers have been initialized.
 
-    dfmask = []
+    Args:
+        - level: desired level. e.g. logging.INFO. Optional. Default is logging.ERROR
+        - prefices: list of one or more str prefices to match (e.g. ["transformers", "torch"]). Optional.
+          Default is `[""]` to match all active loggers.
+          The match is a case-sensitive `module_name.startswith(prefix)`
+    """
+    prefix_re = re.compile(fr'^(?:{ "|".join(prefices) })')
+    for name in logging.root.manager.loggerDict:
+        if re.match(prefix_re, name):
+            logging.getLogger(name).setLevel(level)
+            
+            
+set_global_logging_level(logging.ERROR)
 
-    cer_orig = []; wer_orig = []
-    cer_corr = []; wer_corr = []
-    cer_corr_fix = []; wer_corr_fix = []
-    cer_fix = []; wer_fix = []
-    pdf_fix_out = []; ocr_fix_out = []
-    for i in range(len(dfout_historical)):
+# def fix_ocr(dfout_historical):
+#     dfout_err_h = dfout_historical.copy()
 
-        ocr = dfout_historical.iloc[i]['input_text']
-        pdf = dfout_historical.iloc[i]['target_text']
-        ocr_corr = dfout_historical.iloc[i]['predicted_text']
+#     dfmask = []
 
-        # also, do with just taking out locations of citations, refs and inlines:
-        # ------ 1. inline math --------
-        ind = 0
-        pdf_fix = ''
-        while ind < len(pdf):
-            if '$' in pdf[ind:]:
-                i1 = pdf[ind:].index('$')
-                i2 = pdf[ind+i1+1:].index('$')+i1+1+1
-                # find match
-                pdf_fix += pdf[ind:ind+i1]
-                pdf_fix += '$'
-                #import sys; sys.exit()
-                ind += i2
-            else:
-                pdf_fix += pdf[ind:]
-                ind += len(pdf[ind:])
+#     cer_orig = []; wer_orig = []
+#     cer_corr = []; wer_corr = []
+#     cer_corr_fix = []; wer_corr_fix = []
+#     cer_fix = []; wer_fix = []
+#     pdf_fix_out = []; ocr_fix_out = []
+#     for i in range(len(dfout_historical)):
 
-        ind = 0
-        ocr_corr_fix = ''
-        while ind < len(ocr_corr):
-            if '$' in ocr_corr[ind:]:
-                i1 = ocr_corr[ind:].index('$')
-                nope = False
-                try:
-                    i2 = ocr_corr[ind+i1+1:].index('$')+i1+1+1
-                except:
-                    print('no matching $ in OCR corrected fix!')
-                    nope = True
-                if not nope:
-                    # find match
-                    ocr_corr_fix += ocr_corr[ind:ind+i1]
-                    ocr_corr_fix += '$'
-                    #import sys; sys.exit()
-                    ind += i2
-                else:
-                    ind += i1+1
-            else:
-                ocr_corr_fix += ocr_corr[ind:]
-                ind += len(ocr_corr[ind:])
+#         ocr = dfout_historical.iloc[i]['input_text']
+#         pdf = dfout_historical.iloc[i]['target_text']
+#         ocr_corr = dfout_historical.iloc[i]['predicted_text']
 
-        # ------ 2. citations -----
-        ind = 0
-        pdf_fix2 = ''
-        while ind < len(pdf_fix):
-            if '\\cite' in pdf_fix[ind:]:
-                ind1,ind2 = spc(pdf_fix[ind:],function='\\cite',
-                        dopen='{',dclose='}',
-                       error_out=True)
-                pdf_fix2 += pdf_fix[ind:ind+ind1]
-                pdf_fix2 += '`'
-                ind += ind2
-            else:
-                pdf_fix2 += pdf_fix[ind:]
-                ind += len(pdf_fix[ind:])
+#         # also, do with just taking out locations of citations, refs and inlines:
+#         # ------ 1. inline math --------
+#         ind = 0
+#         pdf_fix = ''
+#         while ind < len(pdf):
+#             if '$' in pdf[ind:]:
+#                 i1 = pdf[ind:].index('$')
+#                 i2 = pdf[ind+i1+1:].index('$')+i1+1+1
+#                 # find match
+#                 pdf_fix += pdf[ind:ind+i1]
+#                 pdf_fix += '$'
+#                 #import sys; sys.exit()
+#                 ind += i2
+#             else:
+#                 pdf_fix += pdf[ind:]
+#                 ind += len(pdf[ind:])
 
-        ind = 0
-        ocr_corr_fix2 = ''
-        while ind < len(ocr_corr_fix):
-            if '\\cite' in ocr_corr_fix[ind:]:
-                ind1,ind2 = spc(ocr_corr_fix[ind:],function='\\cite',
-                        dopen='{',dclose='}',
-                       error_out=True)
-                ocr_corr_fix2 += ocr_corr_fix[ind:ind+ind1]
-                ocr_corr_fix2 += '`'
-                ind += ind2
-            else:
-                ocr_corr_fix2 += ocr_corr_fix[ind:]
-                ind += len(ocr_corr_fix[ind:])
+#         ind = 0
+#         ocr_corr_fix = ''
+#         while ind < len(ocr_corr):
+#             if '$' in ocr_corr[ind:]:
+#                 i1 = ocr_corr[ind:].index('$')
+#                 nope = False
+#                 try:
+#                     i2 = ocr_corr[ind+i1+1:].index('$')+i1+1+1
+#                 except:
+#                     print('no matching $ in OCR corrected fix!')
+#                     nope = True
+#                 if not nope:
+#                     # find match
+#                     ocr_corr_fix += ocr_corr[ind:ind+i1]
+#                     ocr_corr_fix += '$'
+#                     #import sys; sys.exit()
+#                     ind += i2
+#                 else:
+#                     ind += i1+1
+#             else:
+#                 ocr_corr_fix += ocr_corr[ind:]
+#                 ind += len(ocr_corr[ind:])
 
-         # ------ 3. refs -----
-        ind = 0
-        pdf_fix3 = ''
-        while ind < len(pdf_fix2):
-            if '\\ref' in pdf_fix2[ind:]:
-                ind1,ind2 = spc(pdf_fix2[ind:],function='\\ref',
-                        dopen='{',dclose='}',
-                       error_out=True)
-                pdf_fix3 += pdf_fix2[ind:ind+ind1]
-                pdf_fix3 += '*'
-                ind += ind2
-            else:
-                pdf_fix3 += pdf_fix2[ind:]
-                ind += len(pdf_fix2[ind:])
+#         # ------ 2. citations -----
+#         ind = 0
+#         pdf_fix2 = ''
+#         while ind < len(pdf_fix):
+#             if '\\cite' in pdf_fix[ind:]:
+#                 ind1,ind2 = spc(pdf_fix[ind:],function='\\cite',
+#                         dopen='{',dclose='}',
+#                        error_out=True)
+#                 pdf_fix2 += pdf_fix[ind:ind+ind1]
+#                 pdf_fix2 += '`'
+#                 ind += ind2
+#             else:
+#                 pdf_fix2 += pdf_fix[ind:]
+#                 ind += len(pdf_fix[ind:])
 
-        ind = 0
-        ocr_corr_fix3 = ''
-        while ind < len(ocr_corr_fix2):
-            if '\\ref' in ocr_corr_fix2[ind:]:
-                ind1,ind2 = spc(ocr_corr_fix2[ind:],function='\\ref',
-                        dopen='{',dclose='}',
-                       error_out=True)
-                ocr_corr_fix3 += ocr_corr_fix2[ind:ind+ind1]
-                ocr_corr_fix3 += '*'
-                ind += ind2
-            else:
-                ocr_corr_fix3 += ocr_corr_fix2[ind:]
-                ind += len(ocr_corr_fix2[ind:])
+#         ind = 0
+#         ocr_corr_fix2 = ''
+#         while ind < len(ocr_corr_fix):
+#             if '\\cite' in ocr_corr_fix[ind:]:
+#                 ind1,ind2 = spc(ocr_corr_fix[ind:],function='\\cite',
+#                         dopen='{',dclose='}',
+#                        error_out=True)
+#                 ocr_corr_fix2 += ocr_corr_fix[ind:ind+ind1]
+#                 ocr_corr_fix2 += '`'
+#                 ind += ind2
+#             else:
+#                 ocr_corr_fix2 += ocr_corr_fix[ind:]
+#                 ind += len(ocr_corr_fix[ind:])
 
-        #if i == 5: import sys; sys.exit()
+#          # ------ 3. refs -----
+#         ind = 0
+#         pdf_fix3 = ''
+#         while ind < len(pdf_fix2):
+#             if '\\ref' in pdf_fix2[ind:]:
+#                 ind1,ind2 = spc(pdf_fix2[ind:],function='\\ref',
+#                         dopen='{',dclose='}',
+#                        error_out=True)
+#                 pdf_fix3 += pdf_fix2[ind:ind+ind1]
+#                 pdf_fix3 += '*'
+#                 ind += ind2
+#             else:
+#                 pdf_fix3 += pdf_fix2[ind:]
+#                 ind += len(pdf_fix2[ind:])
 
-        # orig errors
-        cer_orig_here = fastwer.score_sent(ocr,pdf, 
-                                      char_level=True)
-        wer_orig_here = fastwer.score_sent(ocr,pdf, 
-                                      char_level=False)
-        # after correction
-        cer_corr_here = fastwer.score_sent(ocr_corr,pdf, 
-                                      char_level=True)
-        wer_corr_here = fastwer.score_sent(ocr_corr,pdf, 
-                                      char_level=False)
+#         ind = 0
+#         ocr_corr_fix3 = ''
+#         while ind < len(ocr_corr_fix2):
+#             if '\\ref' in ocr_corr_fix2[ind:]:
+#                 ind1,ind2 = spc(ocr_corr_fix2[ind:],function='\\ref',
+#                         dopen='{',dclose='}',
+#                        error_out=True)
+#                 ocr_corr_fix3 += ocr_corr_fix2[ind:ind+ind1]
+#                 ocr_corr_fix3 += '*'
+#                 ind += ind2
+#             else:
+#                 ocr_corr_fix3 += ocr_corr_fix2[ind:]
+#                 ind += len(ocr_corr_fix2[ind:])
 
-        # after correction, with replacement
-        cer_corr_fix_here = fastwer.score_sent(ocr_corr_fix3,pdf_fix3, 
-                                      char_level=True)
-        wer_corr_fix_here = fastwer.score_sent(ocr_corr_fix3,pdf_fix3, 
-                                      char_level=False)
+#         #if i == 5: import sys; sys.exit()
 
-        # before correction, with replacement
-        cer_fix_here = fastwer.score_sent(ocr,pdf_fix3, 
-                                      char_level=True)
-        wer_fix_here = fastwer.score_sent(ocr,pdf_fix3, 
-                                      char_level=False)
+#         # orig errors
+#         cer_orig_here = fastwer.score_sent(ocr,pdf, 
+#                                       char_level=True)
+#         wer_orig_here = fastwer.score_sent(ocr,pdf, 
+#                                       char_level=False)
+#         # after correction
+#         cer_corr_here = fastwer.score_sent(ocr_corr,pdf, 
+#                                       char_level=True)
+#         wer_corr_here = fastwer.score_sent(ocr_corr,pdf, 
+#                                       char_level=False)
 
+#         # after correction, with replacement
+#         cer_corr_fix_here = fastwer.score_sent(ocr_corr_fix3,pdf_fix3, 
+#                                       char_level=True)
+#         wer_corr_fix_here = fastwer.score_sent(ocr_corr_fix3,pdf_fix3, 
+#                                       char_level=False)
 
-        # ignore if we haven't checked for extra non-tracked things
-        pdf_check = pdf_fix3.replace('*','').replace('`','').replace('$','')
-        s = re.search(search_doc, pdf_check)
-        if s: # skip
-            dfmask.append(False)
-            continue
-        else:
-            dfmask.append(True)
+#         # before correction, with replacement
+#         cer_fix_here = fastwer.score_sent(ocr,pdf_fix3, 
+#                                       char_level=True)
+#         wer_fix_here = fastwer.score_sent(ocr,pdf_fix3, 
+#                                       char_level=False)
 
 
-        pdf_fix_out.append(pdf_fix3)
-        ocr_fix_out.append(ocr_corr_fix3)
+#         # ignore if we haven't checked for extra non-tracked things
+#         pdf_check = pdf_fix3.replace('*','').replace('`','').replace('$','')
+#         s = re.search(search_doc, pdf_check)
+#         if s: # skip
+#             dfmask.append(False)
+#             continue
+#         else:
+#             dfmask.append(True)
 
 
-        cer_orig.append(cer_orig_here)
-        wer_orig.append(wer_orig_here)
-        cer_corr.append(cer_corr_here)
-        wer_corr.append(wer_corr_here)
-        cer_corr_fix.append(cer_corr_fix_here)
-        wer_corr_fix.append(wer_corr_fix_here)
-        cer_fix.append(cer_fix_here)
-        wer_fix.append(wer_fix_here)
+#         pdf_fix_out.append(pdf_fix3)
+#         ocr_fix_out.append(ocr_corr_fix3)
 
-    # recopy
-    dfout_err_h = dfout_historical.copy().loc[dfmask]
 
-    dfout_err_h['CER Orig'] = cer_orig
-    dfout_err_h['WER Orig'] = wer_orig
-    dfout_err_h['CER Corrected'] = cer_corr
-    dfout_err_h['WER Corrected'] = wer_corr
-    dfout_err_h['CER Fix Corrected'] = cer_corr_fix
-    dfout_err_h['WER Fix Corrected'] = wer_corr_fix
-    dfout_err_h['CER Fix'] = cer_fix
-    dfout_err_h['WER Fix'] = wer_fix
-    dfout_err_h['target_text_fixed'] = pdf_fix_out
-    dfout_err_h['predicted_text_fixed'] = ocr_fix_out
+#         cer_orig.append(cer_orig_here)
+#         wer_orig.append(wer_orig_here)
+#         cer_corr.append(cer_corr_here)
+#         wer_corr.append(wer_corr_here)
+#         cer_corr_fix.append(cer_corr_fix_here)
+#         wer_corr_fix.append(wer_corr_fix_here)
+#         cer_fix.append(cer_fix_here)
+#         wer_fix.append(wer_fix_here)
+
+#     # recopy
+#     dfout_err_h = dfout_historical.copy().loc[dfmask]
+
+#     dfout_err_h['CER Orig'] = cer_orig
+#     dfout_err_h['WER Orig'] = wer_orig
+#     dfout_err_h['CER Corrected'] = cer_corr
+#     dfout_err_h['WER Corrected'] = wer_corr
+#     dfout_err_h['CER Fix Corrected'] = cer_corr_fix
+#     dfout_err_h['WER Fix Corrected'] = wer_corr_fix
+#     dfout_err_h['CER Fix'] = cer_fix
+#     dfout_err_h['WER Fix'] = wer_fix
+#     dfout_err_h['target_text_fixed'] = pdf_fix_out
+#     dfout_err_h['predicted_text_fixed'] = ocr_fix_out
     
-    return dfout_err_h
+#     return dfout_err_h
 
 
 class timeout:
@@ -379,6 +408,8 @@ def add_formatted_columns(datain):
     
 # -------------------------------------------------------------
 
+wait_timeout *= 60.0 # into seconds
+
 test_df = pd.read_csv(aligned_dataset_dir + test_latex)
 # format
 if only_words:
@@ -392,54 +423,55 @@ else:
     test_df = test_df.rename(columns={"sentences source": "input_text", 
                         "sentences target": "target_text"})
 
-args_dict = {
-    #"model_name_or_path": 'google/byt5-small',
-    #"max_len": 4096,
-    #"max_length": 4096,
-    "output_dir": output_dir,
-    "overwrite_output_dir": True,
-    "per_device_train_batch_size": 4,
-    "per_device_eval_batch_size": 4,
-    "gradient_accumulation_steps": 4,
-    "learning_rate": 5e-4,
-    "warmup_steps": 250,
-    "logging_steps": 100,
-    "evaluation_strategy": "steps",
-    "eval_steps": 1000,
-    "num_train_epochs": 4,
-    "do_train": True,
-    "do_eval": True,
-    "fp16": False,
-    #"use_cache": False,
-    "max_steps": 100000,
-    'save_steps':1000,
-    'save_strategy':'steps',
-    # 'load_best_model_at_end': True,
-    # 'metric_for_best_model':'eval_loss',
-    # 'greater_is_better':False
-}
+# args_dict = {
+#     #"model_name_or_path": 'google/byt5-small',
+#     #"max_len": 4096,
+#     #"max_length": 4096,
+#     "output_dir": output_dir,
+#     "overwrite_output_dir": True,
+#     "per_device_train_batch_size": 4,
+#     "per_device_eval_batch_size": 4,
+#     "gradient_accumulation_steps": 4,
+#     "learning_rate": 5e-4,
+#     "warmup_steps": 250,
+#     "logging_steps": 100,
+#     "evaluation_strategy": "steps",
+#     "eval_steps": 1000,
+#     "num_train_epochs": 4,
+#     "do_train": True,
+#     "do_eval": True,
+#     "fp16": False,
+#     #"use_cache": False,
+#     "max_steps": 100000,
+#     'save_steps':1000,
+#     'save_strategy':'steps',
+#     # 'load_best_model_at_end': True,
+#     # 'metric_for_best_model':'eval_loss',
+#     # 'greater_is_better':False
+# }
 
-parser = HfArgumentParser(
-        (TrainingArguments))
-training_args = parser.parse_dict(args_dict)
-# set_seed(training_args.seed)
-args = training_args[0]
+# parser = HfArgumentParser(
+#         (TrainingArguments))
+# training_args = parser.parse_dict(args_dict)
+# # set_seed(training_args.seed)
+# args = training_args[0]
 
 # Load pretrained model and tokenizer
 tokenizer = AutoTokenizer.from_pretrained(
     "google/byt5-small",
     cache_dir=output_dir, 
-    max_length=4096
+#    max_length=4096
+    max_new_tokens=4096
 )
 
-model = T5ForConditionalGeneration.from_pretrained(
-    "google/byt5-small",
-    cache_dir=output_dir,
-)
+# model = T5ForConditionalGeneration.from_pretrained(
+#     "google/byt5-small",
+#     cache_dir=output_dir,
+# )
 
-# overwriting the default max_length of 20 
-tokenizer.model_max_length=4096
-model.config.max_length=4096
+# # overwriting the default max_length of 20 
+# tokenizer.model_max_length=4096
+# model.config.max_length=4096
 
 
 if snapshot == None:
@@ -459,6 +491,8 @@ inds = np.arange(0,len(test_df))
 #inds = inds[:12]
 #imod = 2
 
+model = T5ForConditionalGeneration.from_pretrained(snapshot)
+
 start_time = time.time()
 
 my_storage = {}
@@ -469,15 +503,31 @@ for sto, ind in yt.parallel_objects(inds, nProcs, storage=my_storage):
         print('on', ind, 'of', len(inds),'in', end_time-start_time, 'seconds, or',
              (end_time-start_time)/60., 'minutes')
         start_time = time.time()
-    dfout_here,err = store_file(snapshot, ckpoint, 
-                                test_df.iloc[ind].to_frame().T,
-                               verbose = False)
+    # dfout_here,err = store_file(snapshot, ckpoint, 
+    #                             test_df.iloc[ind].to_frame().T,
+    #                            verbose = False)
+    
+    text = test_df.iloc[ind]['input_text']
+
+    try:
+        with timeout(seconds=int(wait_timeout)):
+            inputs = tokenizer(text, padding="longest", return_tensors="pt")
+            output = model.generate(**inputs)
+            output_text = tokenizer.decode(output[0], 
+                                           skip_special_tokens=skip_specials, 
+                                           clean_up_tokenization_spaces=True)
+            output_text = str(output_text)
+    except:
+        #import sys; sys.exit()
+        print(ind, ': error or timeout in model')
+        output_text = np.nan
+        err = True
     
     # didn't save names since I"m a dingus
-    if not err:
-        df2 = test_df.iloc[ind].to_frame().T.copy()
-        df2['predicted_text'] = str(dfout_here['predicted_text'].values[0])
-        df2.to_csv(output_dir_inf + 's' + str(int(ind)) + ender + '.csv', index=False)
-        del df2
-        del dfout_here
-    
+    df2 = test_df.iloc[ind].to_frame().T.copy()
+    df2['predicted_text'] = output_text
+    df2.to_csv(output_dir_inf + 's' + str(int(ind)) + ender + '.csv', index=False)
+    del df2
+    del output_text
+    del text
+

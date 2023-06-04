@@ -43,8 +43,8 @@ skip_specials = True
 verbose = True
 
 
-# wait_timeout = 5.0 # timeout in minutes
-# batch_size=100
+wait_timeout = 2.0 # timeout in minutes
+use_alt_sent = True # flag for which type of sentence to use as input
 # -------------------------------------------------------------
 
 from torch import cuda
@@ -429,6 +429,8 @@ def add_formatted_columns(datain):
 
 # -------------------------------------------------------------
 
+wait_timeout *= 60.0 # to seconds
+
 # test_df = pd.read_csv(aligned_dataset_dir + test_latex)
 # test_df = test_df.rename(columns={"sentences source": "input_text", 
 #                         "sentences target": "target_text"})
@@ -552,7 +554,10 @@ for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
     pages.append(dir_test['page'])
     sents.append(dir_test['sent'])
     source.append(dir_test['source'])
-    target.append(dir_test['target'])
+    if not use_alt_sent:
+        target.append(dir_test['target'])
+    else:
+        target.append(dir_test['target_alt'])
     types_here.append(dir_test['type'])
     
     df_historical_test_all = pd.DataFrame({'input_text_unclean':source, 
@@ -761,7 +766,7 @@ for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
     
 
     try:
-        with timeout(seconds=int(wait)):
+        with timeout(seconds=int(wait_timeout)):
             inputs = tokenizer(text, padding="longest", return_tensors="pt")
             output = model.generate(**inputs)
             output_text = tokenizer.decode(output[0], 
@@ -776,7 +781,7 @@ for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
         
     # historical model
     try:
-        with timeout(seconds=int(wait)):
+        with timeout(seconds=int(wait_timeout)):
             inputs = tokenizer(text, padding="longest", return_tensors="pt")
             output = model_hist.generate(**inputs)
             output_text_hist = tokenizer.decode(output[0], 
@@ -786,7 +791,7 @@ for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
                 verbose_message += 'historical model predicted: '+ output_text_hist + '\n'
     except:
         print(indd, ': error or timeout in historical model')
-        err = True
+        err_hist = True
         
     if verbose:
         verbose_message += '\n'

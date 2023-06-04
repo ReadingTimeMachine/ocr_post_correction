@@ -1,5 +1,7 @@
 # ocr_post_correction
 
+So much stuff is getting updated right now!  More stuffs soon :D
+
 TODO
 * put in a fake tex document (already marked?)
 * run toy model with TeXSoup, if not marked already
