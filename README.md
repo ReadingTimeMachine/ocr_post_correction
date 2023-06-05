@@ -1,5 +1,15 @@
 # ocr_post_correction
 
+This is the repository for TPDL 2023.  Organization is below:
+
+* `explore_dataset.ipynb` explores the dataset in several ways, including interactive Altair visualizations.
+  * makes use of character and word-level synthetic ground-truth (SGT) and OCR matches
+
+
+# ------------------------
+
+# TODO
+
 So much stuff is getting updated right now!  More stuffs soon :D
 
 TODO
