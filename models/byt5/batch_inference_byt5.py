@@ -24,7 +24,9 @@ wait_timeout = 2.0 # timeout in minutes
 aligned_dataset_dir = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/alignments/'
 ####historical_dataset_dir = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/historical_docs/groundtruth/'
 main_sanskrit_dir = '/Users/jnaiman/pe-ocr-sanskrit/' # should change this
-library_dir = '../'
+
+# where is utils.py?
+library_dir = '../../'
 
 
 imod = 100

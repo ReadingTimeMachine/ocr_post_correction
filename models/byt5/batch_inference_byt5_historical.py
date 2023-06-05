@@ -27,7 +27,9 @@ snapshot_hist = 'checkpoint-160' # set to None to take last
 aligned_dataset_dir = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/alignments/'
 historical_dataset_dir = '/Users/jnaiman/Dropbox/wwt_image_extraction/OCRPostCorrection/historical_docs/groundtruth/'
 main_sanskrit_dir = '/Users/jnaiman/pe-ocr-sanskrit/' # should change this
-library_dir = '../'
+
+# where is utils stored?
+library_dir = '../../'
 
 
 # which types of groundtruths are we wanting to use?
