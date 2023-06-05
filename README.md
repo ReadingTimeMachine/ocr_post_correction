@@ -23,6 +23,7 @@ This is the repository for TPDL 2023.  Organization is below:
   * `byt5/` contains all of the files needed to run and evaluate the byt5 model
   * `windowed/` contains all of the files needed to run and evaluate the windowed model
   * `mBART/` -- initial set up files for the `mBART`, but not used for the paper
+* `example_alignment/` is an example of our alignment routine "in action".  Per our agreement with the arXiv, we cannot release our full dataset as of yet, but we hope this acts as an example of our methods.
 
 
 # ------------------------
