@@ -2,8 +2,21 @@
 
 This is the repository for TPDL 2023.  Organization is below:
 
-* `explore_dataset.ipynb` explores the dataset in several ways, including interactive Altair visualizations.
-  * makes use of character and word-level synthetic ground-truth (SGT) and OCR matches
+## Files
+
+* `explore_visualize_dataset.ipynb` explores character and word-level synthetic ground-truth (SGT) and OCR matches in several ways, including interactive Altair visualizations.
+
+
+
+## Folders
+
+* `data/` - storage location of all data
+  * `all_time_plot.csv` - data showing the arXiv Bulk Downloads and our dataset over our time range (1991-2011)
+  * `letters.pickle` - Python dictionary with each SGT character as key, and all OCR-matched characters as values
+  * `words.pickle` - Python dictionary with each SGT *word* as key, and all OCR-matched words as values
+  * `words_cleaned.pickle` - Python dictionary with each SGT *word* as key, and all OCR-matched words as values.  
+    Here, each SGT word has punctuation and captialization removed (this dictionary is smaller than the one in `words.pickle`)
+* `models/`
 
 
 # ------------------------
