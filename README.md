@@ -20,6 +20,9 @@ This is the repository for TPDL 2023.  Organization is below:
   * `words_cleaned.pickle` - Python dictionary with each SGT *word* as key, and all OCR-matched words as values.  
     Here, each SGT word has punctuation and captialization removed (this dictionary is smaller than the one in `words.pickle`)
 * `models/`
+  * `byt5/` contains all of the files needed to run and evaluate the byt5 model
+  * `windowed/` contains all of the files needed to run and evaluate the windowed model
+  * `mBART/` -- initial set up files for the `mBART`, but not used for the paper
 
 
 # ------------------------
