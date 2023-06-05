@@ -770,3 +770,72 @@ def fix_ocr(dfout_historical,
     dfout_err_h['masked entries'] = dfmask
     
     return dfout_err_h
+
+# input a word-type, output the alignment character
+def select_indicator(wordtype):
+    if wordtype == 'word':
+        indicator = {'pdf': 'W', 'ocr':'W'}
+    elif wordtype == 'inline':
+        indicator = {'pdf': 'I', 'ocr':'I'}
+    elif wordtype == 'cite':
+        indicator = {'pdf': 'C', 'ocr':'C'}
+    elif wordtype == 'hyp-cite-top':
+        indicator = {'pdf': 'c', 'ocr-top':'d', 'ocr-bottom':'e'}
+    elif wordtype == 'hyp-word-top':
+        indicator = {'pdf': 'w', 'ocr-top':'x', 'ocr-bottom':'y'}
+    elif wordtype == 'ref':
+        indicator = {'pdf': 'R', 'ocr':'R'}
+    elif wordtype == 'hyp-inline-top':
+        indicator = {'pdf': 'i', 'ocr-top':'j', 'ocr-bottom':'k'}
+    elif wordtype == 'hyp-ref-top':
+        indicator = {'pdf': 'r', 'ocr-top':'q', 'ocr-bottom':'s'}
+    else:
+        print('no idea!!!')
+        import sys; sys.exit()
+    return indicator       
+
+# reverse -- input character, output the type of character
+def select_wordtype(c):
+    if c == 'W':
+        t = 'word' # does not depend on char_type
+    elif c =='I':
+        t = 'inline'
+    elif c == 'C':
+        t = 'cite'
+    elif c == 'c':
+        t = 'hyp-cite' # only SGT
+    elif c == 'd':
+        t = 'hyp-cite-top' # only OCR
+    elif c == 'e':
+        t = 'hyp-cite-bottom' # only OCR
+    elif c == 'R':
+        t = 'ref'
+    elif c == 'w':
+        t = 'hyp-word' # only SGT
+    elif c == 'x':
+        t = 'hyp-word-top' # only OCR
+    elif c == 'y':
+        t = 'hyp-word-bottom' # only OCR
+    elif c == 'i':
+        t = 'hyp-inline' # only SGT
+    elif c == 'j':
+        t = 'hyp-inline-top' # only OCR
+    elif c == 'k':
+        t = 'hyp-inline-bottom' # only OCR
+    elif c == 'r':
+        t = 'hyp-ref' # only SGT
+    elif c == 'q':
+        t = 'hyp-ref-top' # only OCR
+    elif c == 's':
+        t = 'hyp-ref-bottom' # only OCR
+    elif c == '^':
+        t = 'insert' # only OCR
+    elif c == '@': # only PDF
+        t = 'delete'
+    elif c == ' ': # just a space!
+        t = ' '
+    else:
+        print('no idea here!')
+        import sys; sys.exit()
+    return t
+    
