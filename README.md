@@ -5,6 +5,7 @@ This is the repository for TPDL 2023.  Organization is below:
 ## Files
 
 * `explore_visualize_dataset.ipynb` explores character and word-level synthetic ground-truth (SGT) and OCR matches in several ways, including interactive Altair visualizations.
+* `explore_aligned_dataset.ipynb` explores the aligned sentences used for training the models.  
 
 ## Data & Model Weights
 
