@@ -4,6 +4,29 @@ import numpy as np
 import altair as alt
 import re
 import fastwer
+from pylatexenc.latex2text import LatexNodes2Text
+
+# for counting pdf pages
+from pdfminer.pdfparser import PDFParser
+from pdfminer.pdfdocument import PDFDocument
+from pdfminer.pdfpage import PDFPage
+from pdfminer.pdfinterp import resolve1
+
+from wand.image import Image as WandImage
+from wand.color import Color
+from PIL import Image
+
+import cv2 as cv
+import numpy as np
+import os
+
+from lxml import etree
+from PIL import Image, ImageDraw, ImageFont
+
+
+sp = 65536. * 72.27/72, # latex and printers are different
+sp_printer = sp # naming stuff, this is bad code
+
 
 def error_and_quit(message,ignore_quit=False,warn=True):
     if warn: print(message)
@@ -861,3 +884,814 @@ def get_tikz_preamble():
     
     return tikz_text
     
+    
+    
+# find positions of tikzmarks in aux file
+def find_positions(aux, marker='title', error_out=True):
+    error = False
+    # this part gets the marker names and aligns them to a pgfid ID
+    pStarts = []; pEnds = []
+    tStarts = []; tEnds = [] # pdfid counts
+    astarts = []; aends=[]
+    mstarts = []; mends = [] # markers
+    for a in aux:
+        if marker+'Start' in a and ('writefile' not in a):
+            #a = a.split("}{")[1]#.split("}")[0]
+            tStarts.append(a.split("pgfid")[-1].split("}")[0])
+            pStarts.append("pgfid" + a.split("pgfid")[-1].split("}")[0])
+            #print(a)
+            astarts.append(a)
+            mstarts.append(a.split(str(marker+'Start'))[-1].split('}')[0])
+        elif marker+'End' in a and ('writefile' not in a):
+            #a = a.split("}{")[1]#.split("}")[0]
+            tEnds.append(a.split("pgfid")[-1].split("}")[0])
+            pEnds.append("pgfid" + a.split("pgfid")[-1].split("}")[0])
+            aends.append(a)
+            mends.append(a.split(str(marker+'End'))[-1].split('}')[0])
+    # if not found, try with uppercase for some reason??
+    if [pStarts,pEnds,tStarts,tEnds,astarts,aends]==[[],[],[],[],[],[]]:
+        for a in aux:
+            if str(marker+'Start').upper() in a and ('writefile' not in a):
+                #a = a.split("}{")[1]#.split("}")[0]
+                tStarts.append(a.split("pgfid")[-1].split("}")[0])
+                pStarts.append("pgfid" + a.split("pgfid")[-1].split("}")[0])
+                #print(a)
+                #print(a.split(str(marker+'Start').upper())[-1].split('}')[0])
+                mstarts.append(a.split(str(marker+'Start').upper())[-1].split('}')[0])
+                astarts.append(a)
+            elif str(marker+'End').upper() in a and ('writefile' not in a):
+                #a = a.split("}{")[1]#.split("}")[0]
+                tEnds.append(a.split("pgfid")[-1].split("}")[0])
+                pEnds.append("pgfid" + a.split("pgfid")[-1].split("}")[0])
+                aends.append(a)
+                mends.append(a.split(str(marker+'End').upper())[-1].split('}')[0])
+
+    # checks for misalignments
+    if len(pStarts) != len(pEnds):
+        print('not matched starts and ends')
+        #print(pStarts)
+        #print(pEnds)
+        print(len(pStarts), len(pEnds))
+        print(len(tStarts), len(tEnds))
+        for ps,pe,pps,ppe,aas,aae in zip(tStarts,tEnds,pStarts,pEnds,astarts,aends):
+            ps1 = ps.split(marker+'Start')[-1]
+            pe1 = pe.split(marker+'End')[-1]
+            if ps1!=pe1:
+                print('mismatch:', ps,pe,pps,ppe)
+                print(aas)
+                print(aae)
+                error = True
+                # return error
+                return '', '', '', '', pps, ppe, '','','','',error
+
+
+    # get actual x/y locations AND page location
+    xstart = []; ystart = []; xend=[]; yend=[]; pageStart = []; pageEnd = []
+    others = []; othersPages = []
+    for a in aux:
+        if 'pgfsyspdfmark' in a and 'pgfid' in a and ('writefile' not in a):
+            #print(a)
+            asplit = a.split('pgfid')[-1].split("}")[0]
+            try: # maybe a start?
+                ind = tStarts.index(asplit)
+                x = a.split("pgfid"+tStarts[ind]+"}{")[-1].split("}")[0]
+                y = a.split("pgfid"+tStarts[ind]+"}{")[-1].split("}{")[-1].split("}")[0]
+                xstart.append(x); ystart.append(y)
+                #print(a)
+                #print(x,"|", y)
+            except:
+                #print('no')
+                try:
+                    ind = tEnds.index(asplit)
+                    x = a.split("pgfid"+tEnds[ind]+"}{")[-1].split("}")[0]
+                    y = a.split("pgfid"+tEnds[ind]+"}{")[-1].split("}{")[-1].split("}")[0]
+                    xend.append(x); yend.append(y)
+                except:
+                    #print('issue')
+                    others.append(asplit)
+        elif 'savepicturepage' in a and 'pgfid' in a and ('writefile' not in a):
+            asplit = a.split('pgfid')[-1].split("}")[0]
+            try: # maybe a start?
+                ind = tStarts.index(asplit)
+                pagenum = a.split("pgfid"+tStarts[ind]+"}{")[-1].split("}")[0]
+                pageStart.append(int(pagenum))
+                #print(a)
+                #print(x,"|", y)
+            except:
+                #print('no')
+                try:
+                    ind = tEnds.index(asplit)
+                    pagenum = a.split("pgfid"+tEnds[ind]+"}{")[-1].split("}")[0]
+                    pageEnd.append(int(pagenum))
+                except:
+                    #print('issue')
+                    othersPages.append(asplit)
+                    
+    #checks
+    if len(xstart) != len(xend) != len(ystart) != len(yend):
+        if error_out:
+            error_and_quit('un matched start and end')
+        else:
+            error = True
+            return '', '', '', '', '', '', '','','','',error
+    return xstart, ystart, xend, yend, pageStart, pageEnd, tStarts, tEnds, mstarts,mends,error
+
+
+# collect "real" tex words from parsing tex
+def find_in_tex(texfile,mstart,mend,mtype='mainBody',
+                error_out=False, return_raw=False):
+    """
+    return_raw: return un-formatted tex too?
+    """
+    if type(mstart) != list: mstart = [mstart]
+    if type(mend) != list: mend = [mend]
+    with open(texfile,'r') as f:
+        text = f.read()
+    words = []
+    errors = []
+    raw = []
+    for ms,me in zip(mstart,mend):
+        err = False
+        ss = '\\tikzmark{' + mtype + 'Start' + str(ms) + '}'
+        se = '\\tikzmark{' + mtype + 'End' + str(me) + '}'
+        if ss not in text:
+            if ss.upper() in text: 
+                ss = ss.upper()
+            else:
+                if error_out:
+                    error_and_quit('no start in text!')
+                else:
+                    errors.append('missing starter:'+str(ss))
+                    err = True
+        if se not in text:
+            if se.upper() in text: 
+                se = se.upper()
+            else:
+                if error_out:
+                    error_and_quit('no end in text!')
+                else:
+                    errors.append('missing ender:'+str(se))
+                    err = True
+        if not err:
+            ind1 = text.index(ss) + len(ss)
+            ind2 = text.index(se)
+            try:
+                word = LatexNodes2Text().latex_to_text(text[ind1:ind2])
+            except:
+                #print('roll back to raw')
+                word = text[ind1:ind2]
+            words.append(word)
+            raw.append(text[ind1:ind2])
+         
+    if error_out:
+        if not return_raw:
+            return words
+        else:
+            return words, raw
+    else:
+        if not return_raw:
+            return words, errors
+        else:
+            return words, raw, errors
+
+        
+        
+
+# how many pages in a PDF?
+# how many pages?
+def count_pdf_pages(f):
+    parsed = True
+    with open(f,'rb') as ff:
+        try:
+            parser = PDFParser(ff)
+        except:
+            print('cant parse parser', f)
+            parsed = False
+        if parsed:
+            try:
+                document = PDFDocument(parser)
+            except:
+                print('cant parse at resolve stage', f)
+                parsed = False
+            if parsed:
+                if resolve1(document.catalog['Pages']) is not None:
+                    pages_count = resolve1(document.catalog['Pages'])['Count']  
+                else:
+                    pages_count = 1
+    if not parsed:
+        print('could not parse, assume pages = 1')
+        pages = 1
+    else:
+        pages = pages_count
+    return pages
+
+
+# save all pages in a temporary directory to load and plot later
+def save_pages(ffout, pages,tmp_dir, # ffout is the modified .tex file
+    pdffigures_dpi = 72, # default
+    fac_dpi = 4, # how much larger to make jpeg to avoid any antialiasing, check if exist 
+               check_exist=True,
+              save_fmt = 'jpeg', 
+              fac_down_dpi = 1, 
+              beginner='', 
+              return_error = False): 
+    
+    if ffout[-4:] != '.pdf':
+        pdfout = ffout.replace('.tex','.pdf')
+        split_ffout = ffout.split('/')[-1].split('.tex')[0]
+    else:
+        pdfout = ffout
+        split_ffout = ffout.split('/')[-1].split('.pdf')[0]
+    
+    if fac_down_dpi == None:
+        fac_down_dpi = 1.0/fac_dpi
+
+    page_errors = []
+    for page in pages:
+        outimgname = tmp_dir+ beginner + \
+              split_ffout + \
+             '_p'+str(page) + '.'+save_fmt
+        #print(outimgname)
+        #print(
+
+        # check if it exists
+        err = False
+        if (not os.path.exists(outimgname)) or (not check_exist):
+            try:
+                wimgPDF = WandImage(filename=pdfout +'[' + str(int(page)) + ']', 
+                                    resolution=pdffigures_dpi*fac_dpi, format='pdf') #2x DPI which shrinks later
+            except:
+                err = True
+                print('error in DPI')
+                print(pdfout)
+                
+            if not err:
+                thisSeq = wimgPDF.sequence
+                imPDF = thisSeq[0] # load PDF page into memory
+
+
+                # make sure we do our best to capture accurate text/images
+                imPDF.resize(width=int(round(fac_down_dpi*imPDF.width)),
+                             height=int(round(fac_down_dpi*imPDF.height)))
+                imPDF.background_color = Color("white")
+                imPDF.alpha_channel = 'remove'
+                WandImage(imPDF).save(filename=outimgname)
+                del imPDF
+        page_errors.append(err)
+    if return_error: 
+        return page_errors
+
+    
+# get page's words
+def parse_page(fname_pdf, img_sizeIn, ipage, 
+               xs_main,ys_main,xe_main,ye_main,
+               mStart_main,mEnd_main,pStart_main, pEnd_main,
+              mtype='mainBody', order_tag = 'word', return_raw = True,
+              fpix=8,fac_dpi = 4, fac_down_dpi = 1):
+    
+    pdf_mark_order = []
+    word_pdf = [] # word_pdf.copy()
+
+    hyp = []; order_hyp = []
+    
+    fac = float(fac_dpi)/float(fac_down_dpi)
+
+    for xmin,ymin,xmax,ymax,ms,me,ps,pe in zip(xs_main,ys_main,
+                                               xe_main,ye_main,
+                                       mStart_main,mEnd_main,
+                                       pStart_main, pEnd_main):
+        if ps-1 == ipage: # start and end y are different
+            # to pixel page coords
+            xmin=float(xmin)*fac; ymin=float(ymin)
+            xmax=float(xmax)*fac; ymax=float(ymax)
+            xmin = int(round(xmin/sp_printer[0])); 
+            xmax = int(round(xmax/sp_printer[0]))
+            #ymin = img_sizeIn[0]-int(round((ymin*fac-fpix*fac)/sp_printer[0]))
+            ymin = img_sizeIn[0]-int(round(ymin*fac/sp_printer[0]))
+            ymax = img_sizeIn[0]-int(round(ymax*fac/sp_printer[0]))
+            xmin = round(xmin); xmax = round(xmax); 
+            ymin = round(ymin); ymax = round(ymax)
+
+            w,r,e = find_in_tex(fname_pdf,ms, me, 
+                                mtype=mtype,return_raw=return_raw)
+            if int(ymin)==int(ymax): # non-hyphenated
+                try:
+                    word_pdf.append( (xmin,ymin,xmax,ymax,w[0],r[0]) )
+                    pdf_mark_order.append((order_tag,int(ms)))
+                except:
+                    try:
+                        print('single word order:', w, r)
+                        word_pdf.append( (xmin,ymin,xmax,ymax,w[0],r) )
+                        pdf_mark_order.append((order_tag,int(ms)))
+                    except:
+                        print('single word order, missing:', w, r)
+                        #word_pdf.append( (xmin,ymin,xmax,ymax,w,r) )
+                    
+            else: # hyphenated
+                try:
+                    hyp.append( (xmin,ymin,xmax,ymax,w[0],r[0]) )
+                    order_hyp.append(('hyp-'+order_tag,int(ms)))
+                except:
+                    try:
+                        print('single word order (hyphen):', w, r)
+                        hyp.append( (xmin,ymin,xmax,ymax,w[0],r) )
+                        order_hyp.append(('hyp-'+order_tag,int(ms)))
+                    except:
+                        print('single word order (hyphen), missing:', w, r)
+                
+    return word_pdf, pdf_mark_order, hyp, order_hyp
+
+
+def get_hyp_top_bottom(hyp, regular, hyp_order, regular_order, 
+                       nwords_out = 25, verbose=False, outFac = 5,
+                      fpix=8):
+    """
+    nwords_out : gives bounding to look only around the X number of words of the hyphen
+    """
+    # get y's
+    ys = []
+    for xmin, ymin, xmax, ymax, w, r in regular:
+        ys.append(ymin)
+    ys = np.array(ys)
+
+    pos = []
+    for t,p in regular_order:
+        pos.append(p)
+    pos = np.array(pos)
+    
+    #aprint(len(pos), len(ys))
+
+    hyp_top = []
+    hyp_bottom = []
+    
+    #print('nwords out', nwords_out)
+
+    for (xmin, ymin, xmax, ymax, w, r),(t,order) in zip(hyp,hyp_order):
+        ymin_save = ymin
+        ymax_save = ymax
+        hypOK = True
+        if verbose:
+            print('')
+            # check if hyp_top below hyp_bottom --> if so, it has gone to next column
+            if ymin > ymax:
+                print('---- wraps column ----')
+            print('word :', r)
+        # the data about this particular line -- where it starts
+        # make sure the mark order is LESS than the hyphenated mark order
+        # ymin == ys means that it is exactly on this line
+        #line_before = np.array(regular,dtype=object)[np.where((ymin==ys)&(order > pos) & (order-nwords_out <= pos))]
+        # ymin <= ys means it can be above
+        line_before = np.array(regular,dtype=object)[np.where((ymin>=ys)&(order > pos) & (order-nwords_out <= pos))]
+        if verbose:
+            l = ''
+            for xxmin, yymin, xxmax, yymax, ww, rr in line_before:
+                l += rr + ' '
+            print('   before:', l)
+        # and the subsequent line
+        #line_after = np.array(regular,dtype=object)[np.where((ymax==ys)&(order<pos)&(order+nwords_out >= pos))]
+        line_after = np.array(regular,dtype=object)[np.where((ymax<=ys)&(order<pos)&(order+nwords_out >= pos))]
+        if verbose:
+            l = ''
+            for xxmin, yymin, xxmax, yymax, ww, rr in line_after:
+                l += rr + ' '
+            print('    after:', l)
+        # xmin of the whole line = xmin of line_before
+        if len(line_before)>0 and len(line_after)>0:
+            #xmin_before = min(line_before[:,0].min(), line_after[:,0].min())
+            #xmax_after = max(line_after[:,2].max(), line_before[:,2].max())
+            xmin_before = line_before[:,0].min()
+            xmax_after = line_after[:,2].max()
+        elif len(line_before)>0:
+            xmin_before = line_before[:,0].min()
+            xmax_after = line_before[:,2].max()
+        elif len(line_after)>0:
+            xmin_before = line_after[:,0].min()
+            xmax_after = line_after[:,2].max()
+        else: # neither? try again and then give up
+            line_before = np.array(regular,dtype=object)[np.where((ymin>=ys)&(order > pos) & (order-nwords_out*outFac <= pos))]
+            line_after = np.array(regular,dtype=object)[np.where((ymax<=ys)&(order<pos)&(order+nwords_out*outFac >= pos))]
+            # xmin of the whole line = xmin of line_before
+            if len(line_before)>0 and len(line_after)>0:
+                xmin_before = min(line_before[:,0].min(), line_after[:,0].min())
+                xmax_after = max(line_after[:,2].max(), line_before[:,2].max())
+            elif len(line_before)>0:
+                xmin_before = line_before[:,0].min()
+                xmax_after = line_before[:,2].max()
+            elif len(line_after)>0:
+                xmin_before = line_after[:,0].min()
+                xmax_after = line_after[:,2].max()
+            else: # no luck
+                hypOK = False
+            
+            
+        #xmin_before = line_before[:,0].min()
+        # xmax of the whole line = xmax of line_after(ish)
+        #xmax_after = line_after[:,2].max()
+
+        # check if hyp_top below hyp_bottom --> if so, it has gone to next column
+        # skip this for now
+        if ymin > ymax:
+            if verbose: print('---- wrap column hyphenated not supported!!')
+            hypOK = False
+        # make these hyphenated PARTS of the word
+        if hypOK:
+            hyp_top.append( (xmin,ymin_save, xmax_after,ymin_save, w, r) )
+            hyp_bottom.append( (xmin_before,ymax_save, xmax, ymax_save, w, r) )
+    return hyp_top, hyp_bottom
+
+
+def get_ocr_words(tree,ns, return_paragraph = False):
+    words = []
+    for i,item in enumerate(tree.xpath("//tei:p[@class='ocr_par']", 
+                                       namespaces=ns)):
+        for pw,pc,wordTree in zip(item.xpath(".//*[@class='ocrx_word']/text()",
+                                             namespaces=ns), 
+                               item.xpath(".//*[@class='ocrx_word']/@title",
+                                          namespaces=ns),
+                              item.xpath(".//*[@class='ocrx_word']", 
+                                         namespaces=ns)):
+            # angle too
+            line = wordTree.xpath("../@title", namespaces=ns) # this should be line tag
+            lineid = wordTree.xpath("../@id", namespaces=ns) # also line tag
+            if return_paragraph:
+                paragraph = wordTree.xpath("../../@title",namespaces=ns)
+                paragraph_id = wordTree.xpath("../../@id",namespaces=ns)
+            lang = wordTree.xpath("../../@lang", namespaces=ns) # this should be par tag
+            if len(line) > 1:
+                print('HAVE TOO MANY PARENTS')
+            if 'textangle' in line[0]:
+                # grab text angle
+                textangle = float(line[0].split('textangle')[1].split(';')[0])
+            else:
+                textangle = 0.0
+            # also, get fontsize
+            f = float(line[0].split('x_size')[-1].split(';')[0])
+            # also get baseline for the line
+            if 'baseline' in line[0]:
+                baseline0,baseline1 = np.array(line[0].split('baseline')[-1].split(';')[0].rstrip().lstrip().split(' ')).astype('float')
+            else:
+                baseline0,baseline1 = np.nan,np.nan
+            # get line bounding box
+            lxmin,lymin,lxmax,lymax = np.array(line[0].split('bbox')[-1].split(';')[0].rstrip().lstrip().split(' ')).astype('int')
+            # line decenders and ascenders
+            des = float(line[0].split('x_descenders')[-1].split(';')[0])
+            asc = float(line[0].split('x_ascenders')[-1].split(';')[0])
+            if len(lineid)>1: # too many!
+                print('have too many lines!!')
+            lineid = lineid[0]
+            lineinfo = {'xmin':lxmin,'xmax':lxmax,'ymin':lymin,'ymax':lymax,
+                        'fontsize':f,'baseline0':baseline0,
+                        'baseline1':baseline1, 'descenders':des, 
+                        'ascenders':asc, 'lineID':lineid}
+            
+            if return_paragraph:
+                lxmin,lymin,lxmax,lymax = np.array(paragraph[0].split('bbox')[-1].rstrip().lstrip().split(' ')).astype('int')
+                if len(paragraph_id)>1: # too many!
+                    print('have too many paragraphs!!')
+                paragraph_id = paragraph_id[0]
+                paragraphinfo = {'xmin':lxmin,'xmax':lxmax,'ymin':lymin,'ymax':lymax,
+                            'paragraphID':paragraph_id}
+                
+
+            bb = pc.split('bbox ')[1].split(';')[0]
+            bb = np.array(bb.split(' ')).astype('int').tolist()    
+            x = bb[0]; y = bb[1]
+            w = bb[2]-x; h = bb[3]-y
+            c = pc.split('x_wconf ')[1].split("'")[0]
+            # xmin,ymin,width,height,rotation angle, confidence in %, text
+            if not return_paragraph:
+                where = ( ((x,y,w,h,textangle,int(c),f,lang,lineinfo),pw) )  
+            else:
+                where = ( ((x,y,w,h,textangle,int(c),f,lang,lineinfo, paragraphinfo),pw) )  
+                
+            if where not in words:
+                words.append( where )   
+
+    return words
+
+
+
+def plot_ocr_words(imPlotIn,words, 
+                   drawOCRbox = False, 
+                   drawOCRwords=True,
+                  color_text = (0,0,255),
+                  color_box = (0,255,0),
+                  font_size=18, line_width=1,
+                  use_text_midpoint=False,
+                  font_size_ref = 32, 
+                  img_size = None,
+                  fontpath='/Users/jnaiman/scienceDigitization/simsun.ttc'):
+    '''
+    words: assume in format of tuple of (x,y,w,h,angle,confidence,fontsize,l?),text)
+    use_text_midpoint: set to true to plot words in the centers of boxes
+    img_size : will rescale to this size if not None
+    '''
+    
+    if img_size == None:
+        img_size = imPlotIn.shape
+    
+    # now loop and save this to another image
+    #imPlot = backtorgb.copy()
+    #imPlot[:,:,:] = 255
+
+
+    imPlot = Image.fromarray(imPlotIn)
+    draw = ImageDraw.Draw(imPlot)
+
+    if drawOCRwords:
+        for (x,y,w,h,rot,conf,f,l),text in words:
+            fs = int(round(f/font_size_ref*font_size))
+            font = ImageFont.truetype(fontpath, fs)
+            if use_text_midpoint:
+                ###x = x + 0.5*w
+                y = y + 0.5*h
+
+            # shape = (y,x)
+            x = int(round(x*imPlotIn.shape[1]/img_size[1]))
+            y = int(round(y*imPlotIn.shape[0]/img_size[0]))
+            w = int(round(w*imPlotIn.shape[1]/img_size[1]))
+            h = int(round(h*imPlotIn.shape[0]/img_size[0]))
+            if len(text) > 0:
+                if rot == 0:
+                    draw.text( (x, y), text, font=font, fill=color_text)
+                else:
+                    img_txt = Image.new('RGBA', font.getsize(text), color=(255,255,255,1))
+                    draw_txt = ImageDraw.Draw(img_txt)
+                    draw_txt.text( (0,0), text, font=font, fill=color_text)
+                    rot_im = img_txt.rotate(rot, expand=True, fillcolor="white")
+                    imPlot.paste(rot_im, (x,y))
+
+    imPlot = np.array(imPlot)    
+
+    if drawOCRbox:
+        for (x,y,w,h,rot,conf,f,l),text in words:
+            # shape = (y,x)
+            x = int(round(x*imPlotIn.shape[1]/img_size[1]))
+            y = int(round(y*imPlotIn.shape[0]/img_size[0]))
+            w = int(round(w*imPlotIn.shape[1]/img_size[1]))
+            h = int(round(h*imPlotIn.shape[0]/img_size[0]))
+            cv.rectangle( imPlot, (x, y), (x+w, y+h), color_box, line_width )
+            
+    return imPlot
+
+
+def iou_calc(x1, y1, w1, h1, x2, y2, w2, h2, return_individual = False): 
+    '''
+    Calculate IOU between box1 and box2
+
+    Parameters
+    ----------
+    - x, y : box ***center*** coords
+    - w : box width
+    - h : box height
+    - return_individual: return intersection, union and IOU? default is False
+    
+    Returns
+    -------
+    - IOU
+    '''   
+    xmin1 = x1 - 0.5*w1
+    xmax1 = x1 + 0.5*w1
+    ymin1 = y1 - 0.5*h1
+    ymax1 = y1 + 0.5*h1
+    xmin2 = x2 - 0.5*w2
+    xmax2 = x2 + 0.5*w2
+    ymin2 = y2 - 0.5*h2
+    ymax2 = y2 + 0.5*h2
+    interx = np.minimum(xmax1, xmax2) - np.maximum(xmin1, xmin2)
+    intery = np.minimum(ymax1, ymax2) - np.maximum(ymin1, ymin2)
+    inter = interx * intery
+    union = w1*h1 + w2*h2 - inter
+    iou = inter / (union + 1e-6)
+    if not return_individual:
+        return iou
+    else:
+        return inter, union, iou
+
+    
+    
+#    words = words_ocr.copy()
+#    verbose = True
+def align_sgt_ocr(words, word_pdf_full, pdf_mark_order_full, verbose=True, fpix=8, fsize=11):
+
+    #alignment_pages = {} #: for all pdf words dictionary, one for each page
+
+    # ------- OCR words in to format of PDF -------
+    # get all OCR words into PDF axis for faster comparison
+    word_inds = np.arange(len(words))
+    ocr_boxes = []
+    for oi in range(len(words)):
+        word = words[oi][0] # word info
+        #text_ocr_here = words[oi][-1] # default is *not* raw -- with greek/latin
+        xmin2,ymin2,w,h = word[0],word[1],word[2],word[3]
+        xmax2 = xmin2+w; ymax2 = ymin2+h
+        ocr_boxes.append((xmin2,ymin2,xmax2,ymax2))
+    ocr_boxes = np.array(ocr_boxes)
+
+
+    # *********** Align OCR to PDF words *************
+    ocr_words_aligned = [] # length of PDF words
+    ocr_inds = np.arange(len(words))
+
+    # keep track of OCR-matched indices
+    # in theory there should only be ONE pdf word for each OCR word
+    ocr_inds_track = []
+
+    pdf_words_aligned = []; pdf_words_aligned_type = []
+    if verbose==2: 
+        print('matching', len(ocr_boxes), 'ocr boxes,', len(word_pdf_full), 'pdf boxes')
+    cond1=''; cond2=''; cond3=''; cond4=''
+    if len(ocr_boxes) > 0:
+        for ind in range(len(word_pdf_full)): # all PDF words
+            pdf_words_aligned.append(word_pdf_full[ind])
+            pdf_words_aligned_type.append(pdf_mark_order_full[ind][0])
+            # find all overlapping -- all OCR words that overlap with the PDF word
+            xmin1,ymin1,xmax1,ymax1 = word_pdf_full[ind][:4]
+            cond1 = xmin1>ocr_boxes[:,2]
+            cond2 = xmax1<ocr_boxes[:,0]
+            cond3 = ymax1<ocr_boxes[:,1]
+            cond4 = ymin1-fpix>ocr_boxes[:,3]
+            cond = cond1 | cond2 | cond3 | cond4
+            # opposite
+            oinds = ocr_inds[~cond]
+            words_this_pdf = []; xs = []
+            text_ocr = []; oinds_save = []
+            for ioi,oi in enumerate(oinds): # loop through all of the OCR words that overlap with this PDF word
+                xmin2,ymin2,xmax2,ymax2 = ocr_boxes[oi]
+
+                # is it already in there? i.e. have we already matched this OCR word to a PDF word before?
+                useOCRWord = True
+                if oi in ocr_inds_track: # it is already in there! 
+                    # We have to figure out which match to keep -- the initially tracked word, or this new one?
+                    # we have to search through all already stored words... there is probably a better way
+                    oasave = -1
+                    for ioa,oa in enumerate(ocr_words_aligned): # find which word matches
+                        if oi in oa[-1]: # in stored list of inds?
+                            oasave = oa # saved info about stuff -- there will always only be 1!
+                            break
+                    if oasave == -1: # this shouldn't happen??
+                        print('   oi not found=', oi) 
+                        import sys; sys.exit()
+                    else: # have a thing!
+                        if verbose==2: print('overlap for', oi)
+                        indoverlap = ocr_words_aligned.index(oasave) # what PDF word does this OCR word overlap with that we have already stored
+                        xs_here = []; oinds_here = []
+                        # for this new OCR word -- does it overlap more with the prior PDF word (indoverlap), or the new one (ind)
+                        # get the bounding box info for the prior PDF box & this box
+                        #           [NEW pdf word,            OLD pdf word]
+                        pdfboxes = [word_pdf_full[ind][:4],word_pdf_full[indoverlap][:4]]
+                        # get OCR box for this current box
+                        ocr_boxes_here = ocr_boxes[oi] # new bounding box this OCR word, grabbed again
+                        # calculate IOUs of OCR word and both PDF boxes
+                        ious = []
+                        for pb in pdfboxes:
+                            ious.append(iou_calc(pb[0], pb[1], pb[2], pb[3],
+                                                ocr_boxes_here[0],ocr_boxes_here[1],
+                                                ocr_boxes_here[1],ocr_boxes_here[3]))
+                        # take the original or the found
+                        if np.argmax(ious) == 1: # the previously found PDF word matches best with this OCR
+                            if verbose==2: print('taking the previous word, will ignore this OCR word for this PDF')
+                            useOCRWord = False # nothing changes
+                        else: # the NEW PDF word is the better match
+                            if verbose==2: print('take new PDF word!')
+                            # ocr_words_aligned == what words are aligned with the PDF word (ind)
+                            if len(ocr_words_aligned[indoverlap][0]) > 1: # we have multiple OCR words attached to this PDF! must take ONLY the matched one here
+                                # find the one that matches in the collection, and remove ONLY that OCR word
+                                if verbose==2: print('   multi words!')
+                                ocr_words_aligned_out = []
+                                texts2 = []; wtp2 = []; xs2 = []; oinds2 = []
+                                for iw,(w,winfo,w2,w3) in enumerate(zip(ocr_words_aligned[indoverlap][0], ocr_words_aligned[indoverlap][1],
+                                                                       ocr_words_aligned[indoverlap][2],ocr_words_aligned[indoverlap][3])):
+                                    # check that the words match
+                                    # is the found word the same as the initial word? if so, we want to make
+                                    #  sure it is removed from the prior PDF word it was attached to
+                                    if w == words[oi][1] and ( (winfo == list(words[oi][0])) or (winfo == tuple(words[oi][0])) ): # formatting sillyness
+                                        if verbose==2: print('found', w, 'ind=',ind,'oi=', oi, 'words[oi]=', words[oi][1])
+                                        pass
+                                    else: # don't match, then keep
+                                        texts2.append(w); wtp2.append(winfo)
+                                        xs2.append(w2); oinds2.append(w3)
+                                ocr_words_aligned[indoverlap] = (texts2, wtp2, xs2, oinds2)
+
+                            else: # only 1 OCR word associated with prior PDF word, set to empty
+                                if verbose==2: print('   only one!')
+                                if verbose==2: print(ocr_words_aligned[indoverlap])
+                                ocr_words_aligned[indoverlap] = ('', words_this_pdf,xs, [-2])
+
+                if useOCRWord:
+                    word = words[oi][0] # word info
+                    text_ocr_here = words[oi][-1] # default is *not* raw -- with greek/latin
+                    words_this_pdf.append(word)
+                    text_ocr.append(text_ocr_here)
+                    xs.append((xmin2,ymin2,xmax2,ymax2))
+                    ocr_inds_track.append(oi)
+                    ocr_inds_track = np.unique(ocr_inds_track).tolist() # don't double count, shouldn't be an issue
+                    oinds_save.append(oi)
+                else:
+                    pass
+
+            # 3. if multiple OCR words for a PDF word, order by x and smoosh into 1 word
+            if len(xs)>1: # many words
+                asort = np.argsort(np.array(xs)[:,0]) # sort by xmin
+                words_this_pdf = np.array(words_this_pdf,dtype=object)[asort]
+                texts = np.array(text_ocr)[asort].astype('str').tolist()
+                ocr_words_aligned.append((texts, words_this_pdf.tolist(),xs, np.array(oinds_save)[asort].tolist()))
+            elif len(xs) == 0: # no words!
+                if verbose==2: print('no OCR words match this PDF! : ', word_pdf_full[ind])
+                ocr_words_aligned.append(('', words_this_pdf,xs, [-2]))
+            else: # one word
+                ocr_words_aligned.append((text_ocr, words_this_pdf,xs, [oinds_save[0]]))
+
+
+        # 4. "unwrap" PDF words by tikzmark number and unwrap OCR word's associated
+        # align
+        if len(pdf_mark_order_full)>0:
+            pdf_mark_order_full = np.array(pdf_mark_order_full, dtype=object)
+            asort = np.argsort(pdf_mark_order_full[:,1])
+            if len(pdf_words_aligned) > 0 and len(pdf_words_aligned_type)>0 and len(ocr_words_aligned)>0:
+                pdf_words_aligned = np.array(pdf_words_aligned,dtype=object)[asort].tolist()
+                pdf_words_aligned_type = np.array(pdf_words_aligned_type,dtype=object)[asort].tolist()
+                ocr_words_aligned = np.array(ocr_words_aligned,dtype=object)[asort].tolist()
+
+    # ********** align -- make dictionaries ***************
+    alignment = {}
+    # NON-hypenated!
+    for pmark_all,pword,ptype,oword in zip(pdf_mark_order_full, 
+                                       pdf_words_aligned,pdf_words_aligned_type,
+                                       ocr_words_aligned):
+        pmark = pmark_all[-1] # location index
+        # PDF
+        pwd = {}
+        if ptype != 'word':
+            pwd['word'] = pword[-1]
+        else:
+            pwd['word'] = pword[-2]
+        pwd['raw'] = pword[-1]
+        pwd['xmin'] = pword[0]; pwd['ymin'] = pword[1]-fpix
+        pwd['xmax'] = pword[2]; pwd['ymax'] = pword[3]
+        if 'hyp-' not in ptype:
+            pwd['hyphenated'] = False
+        else:
+            pwd['hyphenated'] = True
+        pwd['assumed fontsize transformations'] = {'fontsize':fsize, 'fpix':fpix}
+        pwd['word type'] = ptype
+
+        # ocr -- could be multiple words per PDF! already sorted by x
+        owd = {}
+        for o,wtp,x in zip(oword[0],oword[1],oword[2]): # all words
+            ow = {}
+            # locations, scaled to PDF 
+            ow['xmin'] = x[0]; ow['ymin']=x[1]; ow['xmax']=x[2]; ow['ymax']=x[3]
+            ow['rotation'] = wtp[4]
+            ow['confidence'] = wtp[5]
+            ow['font size'] = wtp[6]
+            ow['languages'] = wtp[7]
+            ow['baseline0'] = wtp[8]['baseline0']
+            ow['baseline1'] = wtp[8]['baseline1']
+            ow['descenders'] = wtp[8]['descenders']
+            ow['ascenders'] = wtp[8]['ascenders']
+            ow['lineID'] = wtp[8]['lineID']
+            owd[o] = ow # o is the 
+
+        alignment[pmark] = {'PDF word':pwd, 'OCR words':owd}
+        #alignment_pages['page'+str(ipage)] = alignment
+
+        # ******* Getting ignore/not ignore *******
+        pdf_text = ''; ocr_text = ''; pdf_mark_char = []
+        pdfmarks = np.sort(list(alignment.keys()))
+        ignore = []
+        for pm in pdfmarks: # loop over all words
+            pdf_text += alignment[pm]['PDF word']['word'] + ' '
+            pdf_mark_char_here = []; ignore_here = []
+            for p in range(len(alignment[pm]['PDF word']['word'])+1): 
+                pdf_mark_char_here.append(pm)
+            pdf_mark_char.append(pdf_mark_char_here)
+            # all OCR words
+            for ow in alignment[pm]['OCR words'].keys():
+                ocr_text += ow + ' '
+            if alignment[pm]['PDF word']['word type'] == 'word':
+                for p in range(len(alignment[pm]['PDF word']['word'])+1): 
+                    ignore_here.append(' ')
+            elif alignment[pm]['PDF word']['word type'] == 'inline':
+                for p in range(len(alignment[pm]['PDF word']['word'])+1): 
+                    ignore_here.append('I')
+                if verbose==2: print('ignoring inline:', alignment[pm]['PDF word']['word'])
+            elif alignment[pm]['PDF word']['word type'] == 'cite':
+                for p in range(len(alignment[pm]['PDF word']['word'])+1): 
+                    ignore_here.append('C')
+                if verbose==2: print('ignoring citation:', alignment[pm]['PDF word']['word'])
+            elif alignment[pm]['PDF word']['word type'] == 'ref':
+                for p in range(len(alignment[pm]['PDF word']['word'])+1): 
+                    ignore_here.append('R')
+                if verbose==2: print('ignoring ref:', alignment[pm]['PDF word']['word'])
+            elif 'hyp-' in alignment[pm]['PDF word']['word type']:
+                for p in range(len(alignment[pm]['PDF word']['word'])+1): 
+                    ignore_here.append('H')
+                if verbose==2: print('ignoring hyphen:', alignment[pm]['PDF word']['word'])  
+            else: # this shold not happen
+                for p in range(len(alignment[pm]['PDF word']['word'])+1): 
+                    ignore_here.append('*')
+                if verbose==2: print('ignoring ???????:', alignment[pm]['PDF word']['word'])
+            ignore.append(ignore_here)
+            
+    return alignment
