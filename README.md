@@ -31,4 +31,3 @@ This is the repository for TPDL 2023.  Organization is below:
 # TODO
 
 1. add in Zenodo links
-1. alignment example
