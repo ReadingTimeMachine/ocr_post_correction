@@ -839,3 +839,25 @@ def select_wordtype(c):
         import sys; sys.exit()
     return t
     
+    
+# for when passing a list with comments already taken out
+def get_tikz_preamble():
+
+    error = False
+    t2 = [] # store tikzmark lines
+    t2.append('\\usepackage{tikz}\n\\usetikzlibrary{tikzmark}\n')
+    # libraries 
+    t2.append('\\usepackage{atbegshi,ifthen,listings}')
+    t2.append('\\tikzstyle{highlighter} = [yellow,line width = \\baselineskip,]')
+    t2.append('% from: https://tex.stackexchange.com/questions/15237/highlight-text-in-code-listing-while-also-keeping-syntax-highlighting/49309#49309')
+    t2.append('\\newcounter{highlight}[page]')
+    t2.append('\\newcommand{\\tikzhighlightanchor}[1]{\\ensuremath{\\vcenter{\\hbox{\\tikz[remember picture, overlay]{\\coordinate (#1 highlight \\arabic{highlight});}}}}}')
+    t2.append('\\newcommand{\\bh}[0]{\\stepcounter{highlight}\\tikzhighlightanchor{begin}}')
+    t2.append('\\newcommand{\\eh}[0]{\\tikzhighlightanchor{end}}')
+    t2.append('\\AtBeginShipout{\\AtBeginShipoutUpperLeft{\\ifthenelse{\\value{highlight} > 0}{\\tikz[remember picture, overlay]{\\foreach \\stroke in {1,...,\\arabic{highlight}} \\draw[highlighter] (begin highlight \\stroke) -- (end highlight \\stroke);}}{}}}')
+    t2.append('\n') # extra
+
+    tikz_text = "\n".join(t2)
+    
+    return tikz_text
+    

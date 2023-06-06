@@ -1,0 +1,248 @@
+This is BibTeX, Version 0.99d (TeX Live 2021)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: mnras_template_clean_marked.aux
+The style file: mnras.bst
+I couldn't open database file bib_agb_2016.bib
+---line 277 of file mnras_template_clean_marked.aux
+ : \bibdata{bib_agb_2016
+ :                      }
+I'm skipping whatever remains of this command
+I found no database files---while reading file mnras_template_clean_marked.aux
+Reallocated field_info (elt_size=4) to 10211 items from 5000.
+Warning--I didn't find a database entry for "lada2003"
+Warning--I didn't find a database entry for "bastian2017"
+Warning--I didn't find a database entry for "longmore2014"
+Warning--I didn't find a database entry for "krui2015"
+Warning--I didn't find a database entry for "gratton2001"
+Warning--I didn't find a database entry for "briley2002"
+Warning--I didn't find a database entry for "cohen2002"
+Warning--I didn't find a database entry for "cannon1998"
+Warning--I didn't find a database entry for "pancino2010b"
+Warning--I didn't find a database entry for "sneden2004"
+Warning--I didn't find a database entry for "kraft1993"
+Warning--I didn't find a database entry for "ivans1999"
+Warning--I didn't find a database entry for "carretta2006b"
+Warning--I didn't find a database entry for "carretta2009b"
+Warning--I didn't find a database entry for "conroy2012"
+Warning--I didn't find a database entry for "karakas2007"
+Warning--I didn't find a database entry for "ventura2008b"
+Warning--I didn't find a database entry for "carretta2009"
+Warning--I didn't find a database entry for "bastian2013b"
+Warning--I didn't find a database entry for "prantzos2007"
+Warning--I didn't find a database entry for "ventura2008a"
+Warning--I didn't find a database entry for "pflamm2009"
+Warning--I didn't find a database entry for "dercole2010"
+Warning--I didn't find a database entry for "conroy2011a"
+Warning--I didn't find a database entry for "deMink2009"
+Warning--I didn't find a database entry for "den2014"
+Warning--I didn't find a database entry for "prantzos2006"
+Warning--I didn't find a database entry for "dercole2008"
+Warning--I didn't find a database entry for "vesperini2010"
+Warning--I didn't find a database entry for "calura2015"
+Warning--I didn't find a database entry for "priestley2011"
+Warning--I didn't find a database entry for "rg2008"
+Warning--I didn't find a database entry for "pittard2013"
+Warning--I didn't find a database entry for "mauas2006"
+Warning--I didn't find a database entry for "smith1999"
+Warning--I didn't find a database entry for "naiman2011"
+Warning--I didn't find a database entry for "naiman2009"
+Warning--I didn't find a database entry for "desilva2009"
+Warning--I didn't find a database entry for "martell2009"
+Warning--I didn't find a database entry for "pancino2010a"
+Warning--I didn't find a database entry for "krause2013"
+Warning--I didn't find a database entry for "moore2011"
+Warning--I didn't find a database entry for "leigh2013a"
+Warning--I didn't find a database entry for "conroy2011b"
+Warning--I didn't find a database entry for "mcdonald2015"
+Warning--I didn't find a database entry for "bastian2014b"
+Warning--I didn't find a database entry for "hollyhead2015"
+Warning--I didn't find a database entry for "paxton2011"
+Warning--I didn't find a database entry for "quad2004"
+Warning--I didn't find a database entry for "hue2010"
+Warning--I didn't find a database entry for "fryxell2000"
+Warning--I didn't find a database entry for "bruns2009"
+Warning--I didn't find a database entry for "gnat2007"
+Warning--I didn't find a database entry for "dalgarno1972"
+Warning--I didn't find a database entry for "faulk1977"
+Warning--I didn't find a database entry for "wilkin1996"
+Warning--I didn't find a database entry for "truelove1997"
+Warning--I didn't find a database entry for "blocker1995"
+Warning--I didn't find a database entry for "ventura2000"
+Warning--I didn't find a database entry for "reimers1975"
+Warning--I didn't find a database entry for "marigo2012"
+Warning--I didn't find a database entry for "demircan1991"
+Warning--I didn't find a database entry for "kalirai2013a"
+Warning--I didn't find a database entry for "kalirai2013b"
+Warning--I didn't find a database entry for "kulebi2013"
+Warning--I didn't find a database entry for "zhao2012"
+Warning--I didn't find a database entry for "cranmer2011"
+Warning--I didn't find a database entry for "dejager1988"
+Warning--I didn't find a database entry for "searle2008"
+Warning--I didn't find a database entry for "waters1987"
+Warning--I didn't find a database entry for "debes2006"
+Warning--I didn't find a database entry for "badalyan1992"
+Warning--I didn't find a database entry for "morin2008"
+Warning--I didn't find a database entry for "wood2005"
+Warning--I didn't find a database entry for "cohen2011"
+Warning--I didn't find a database entry for "abbott1978"
+Warning--I didn't find a database entry for "evans2004"
+Warning--I didn't find a database entry for "schaerer1996"
+Warning--I didn't find a database entry for "nyman1992"
+Warning--I didn't find a database entry for "vass1993"
+Warning--I didn't find a database entry for "loup1993"
+Warning--I didn't find a database entry for "dupree1987"
+Warning--I didn't find a database entry for "dupree1992a"
+Warning--I didn't find a database entry for "mcdonald2007"
+Warning--I didn't find a database entry for "dupree2009"
+Warning--I didn't find a database entry for "meszaros2009"
+Warning--I didn't find a database entry for "smith2004"
+Warning--I didn't find a database entry for "pas2014"
+Warning--I didn't find a database entry for "villaver2003"
+Warning--I didn't find a database entry for "villaver2012"
+Warning--I didn't find a database entry for "pooley2003"
+Warning--I didn't find a database entry for "smith1988"
+Warning--I didn't find a database entry for "dupree1992b"
+Warning--I didn't find a database entry for "pooley2006"
+Warning--I didn't find a database entry for "kroupa2013"
+Warning--I didn't find a database entry for "kroupa2001"
+Warning--I didn't find a database entry for "mcnamara"
+Warning--I didn't find a database entry for "gerssen"
+Warning--I didn't find a database entry for "beasley"
+Warning--I didn't find a database entry for "caldwell"
+Warning--I didn't find a database entry for "gratton2004"
+Warning--I didn't find a database entry for "carretta2010c"
+Warning--I didn't find a database entry for "cohen2005"
+Warning--I didn't find a database entry for "piotto2007"
+Warning--I didn't find a database entry for "marino2009"
+Warning--I didn't find a database entry for "carretta2009a"
+Warning--I didn't find a database entry for "ferraro2009"
+Warning--I didn't find a database entry for "carretta2010a"
+Warning--I didn't find a database entry for "harris1996"
+Warning--I didn't find a database entry for "usher2015"
+Warning--I didn't find a database entry for "li2016"
+Warning--I didn't find a database entry for "martell2013"
+Warning--I didn't find a database entry for "mucc2008"
+Warning--I didn't find a database entry for "mucc2014"
+Warning--I didn't find a database entry for "blocker"
+Warning--I didn't find a database entry for "bondi"
+Warning--I didn't find a database entry for "goud2014"
+Warning--I didn't find a database entry for "whitmore2007"
+Warning--I didn't find a database entry for "zwart2010"
+Warning--I didn't find a database entry for "ten1986"
+Warning--I didn't find a database entry for "bastian2014a"
+Warning--I didn't find a database entry for "cabrera2015"
+Warning--I didn't find a database entry for "longmore2015"
+Warning--I didn't find a database entry for "bastian2013a"
+Warning--I didn't find a database entry for "mart2018"
+Warning--I didn't find a database entry for "peacock2013"
+Warning--I didn't find a database entry for "cabrera2016"
+Warning--I didn't find a database entry for "bastian2016"
+Warning--I didn't find a database entry for "piatti2016"
+Warning--I didn't find a database entry for "dantona2004"
+Warning--I didn't find a database entry for "ventura2001"
+Warning--I didn't find a database entry for "larsen2011"
+Warning--I didn't find a database entry for "cabrera2014"
+Warning--I didn't find a database entry for "fenner2004"
+Warning--I didn't find a database entry for "karakas2006"
+Warning--I didn't find a database entry for "choi2008"
+Warning--I didn't find a database entry for "bekki2007"
+Warning--I didn't find a database entry for "doherty2014a"
+Warning--I didn't find a database entry for "doherty2014b"
+Warning--I didn't find a database entry for "dercole2011"
+Warning--I didn't find a database entry for "bekki2011"
+Warning--I didn't find a database entry for "maeder2006"
+Warning--I didn't find a database entry for "decressin2007a"
+Warning--I didn't find a database entry for "decressin2007b"
+Warning--I didn't find a database entry for "charbonnel2013"
+Warning--I didn't find a database entry for "cassisi2014a"
+Warning--I didn't find a database entry for "henault2015"
+Warning--I didn't find a database entry for "milone2016"
+Warning--I didn't find a database entry for "scally2001"
+Warning--I didn't find a database entry for "dejuan2012"
+Warning--I didn't find a database entry for "villanova2007"
+Warning--I didn't find a database entry for "elmegreen2017"
+Warning--I didn't find a database entry for "wunsch2017"
+Warning--I didn't find a database entry for "charbonnel2014"
+Warning--I didn't find a database entry for "marcolini2009"
+Warning--I didn't find a database entry for "hopkins2014"
+Warning--I didn't find a database entry for "bastian2015a"
+Warning--I didn't find a database entry for "ruiz2015"
+Warning--I didn't find a database entry for "trancho2014"
+Warning--I didn't find a database entry for "zhu2003"
+Warning--I didn't find a database entry for "frank1976"
+Warning--I didn't find a database entry for "perren2017"
+Warning--I didn't find a database entry for "decressin2009"
+Warning--I didn't find a database entry for "odenkirchen1997"
+Warning--I didn't find a database entry for "tayler1975"
+Warning--I didn't find a database entry for "heiles1966"
+Warning--I didn't find a database entry for "robinson1967"
+Warning--I didn't find a database entry for "kerr1972"
+Warning--I didn't find a database entry for "knapp1973b"
+Warning--I didn't find a database entry for "bowers1979"
+Warning--I didn't find a database entry for "birkinshaw1983"
+Warning--I didn't find a database entry for "lynch1989"
+Warning--I didn't find a database entry for "smith1990"
+Warning--I didn't find a database entry for "vanloon2006"
+Warning--I didn't find a database entry for "vanloon2009"
+Warning--I didn't find a database entry for "troland1978"
+Warning--I didn't find a database entry for "smith1995"
+Warning--I didn't find a database entry for "leon1996"
+Warning--I didn't find a database entry for "knapp1973a"
+Warning--I didn't find a database entry for "kerr1976"
+Warning--I didn't find a database entry for "frail1994"
+Warning--I didn't find a database entry for "cohen1979"
+Warning--I didn't find a database entry for "dickey1980"
+Warning--I didn't find a database entry for "lynch1990"
+Warning--I didn't find a database entry for "knapp1995"
+Warning--I didn't find a database entry for "origlia1996"
+Warning--I didn't find a database entry for "hopwood1998"
+Warning--I didn't find a database entry for "hopwood1999"
+Warning--I didn't find a database entry for "evans2003"
+Warning--I didn't find a database entry for "boyer2006"
+Warning--I didn't find a database entry for "barmby2009"
+Warning--I didn't find a database entry for "camilo2000"
+Warning--I didn't find a database entry for "krause2012"
+Reallocated singl_function (elt_size=4) to 100 items from 50.
+Reallocated singl_function (elt_size=4) to 100 items from 50.
+You've used 0 entries,
+            2881 wiz_defined-function locations,
+            911 strings with 7918 characters,
+and the built_in function-call counts, 39 in all, are:
+= -- 0
+> -- 0
+< -- 0
++ -- 0
+- -- 0
+* -- 0
+:= -- 9
+add.period$ -- 0
+call.type$ -- 0
+change.case$ -- 0
+chr.to.int$ -- 0
+cite$ -- 0
+duplicate$ -- 0
+empty$ -- 1
+format.name$ -- 0
+if$ -- 1
+int.to.chr$ -- 1
+int.to.str$ -- 0
+missing$ -- 0
+newline$ -- 13
+num.names$ -- 0
+pop$ -- 0
+preamble$ -- 1
+purify$ -- 0
+quote$ -- 0
+skip$ -- 1
+stack$ -- 0
+substring$ -- 0
+swap$ -- 0
+text.length$ -- 0
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 0
+warning$ -- 0
+while$ -- 0
+width$ -- 0
+write$ -- 12
+(There were 2 error messages)
