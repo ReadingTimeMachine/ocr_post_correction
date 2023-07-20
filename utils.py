@@ -12,8 +12,6 @@ from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfinterp import resolve1
 
-from wand.image import Image as WandImage
-from wand.color import Color
 from PIL import Image
 
 import cv2 as cv
@@ -158,7 +156,8 @@ def split_function_with_delimiters_with_checks(l,function='\\footnote',
 
     
 def align_texts_fast(ocr_text, pdf_text, eops, 
-                     pdf_types = None, ocr_types = None):
+                     pdf_types = None, ocr_types = None,
+                    src_mark = '^', des_mark='@'):
     
     pdf_text_aligned2 = list(pdf_text)
     ocr_text_aligned2 = list(pdf_text)
@@ -180,16 +179,16 @@ def align_texts_fast(ocr_text, pdf_text, eops,
                 ocr_type_aligned2[dp+nadd] = ocr_types[sp]
 
         elif operation == 'insert': # insert in source (OCR)
-            ocr_text_aligned2[dp+nadd] = '^'
+            ocr_text_aligned2[dp+nadd] = src_mark
             if use_types:
-                ocr_type_aligned2[dp+nadd] = '^'
+                ocr_type_aligned2[dp+nadd] = src_mark
 
         elif operation == 'delete': # take off in OCR --> same as insert in PDF
-            pdf_text_aligned2.insert(dp+nadd,'@')
+            pdf_text_aligned2.insert(dp+nadd,des_mark)
             ocr_text_aligned2.insert(dp+nadd, ocr_text[sp])
             if use_types:
                 ocr_type_aligned2.insert(dp+nadd, ocr_types[sp])
-                pdf_type_aligned2.insert(dp+nadd, '@')
+                pdf_type_aligned2.insert(dp+nadd, des_mark)
             nadd += 1 # update because we have now made the destination string longer
         else:
             print('unknown operation')
@@ -1086,60 +1085,6 @@ def count_pdf_pages(f):
     return pages
 
 
-# save all pages in a temporary directory to load and plot later
-def save_pages(ffout, pages,tmp_dir, # ffout is the modified .tex file
-    pdffigures_dpi = 72, # default
-    fac_dpi = 4, # how much larger to make jpeg to avoid any antialiasing, check if exist 
-               check_exist=True,
-              save_fmt = 'jpeg', 
-              fac_down_dpi = 1, 
-              beginner='', 
-              return_error = False): 
-    
-    if ffout[-4:] != '.pdf':
-        pdfout = ffout.replace('.tex','.pdf')
-        split_ffout = ffout.split('/')[-1].split('.tex')[0]
-    else:
-        pdfout = ffout
-        split_ffout = ffout.split('/')[-1].split('.pdf')[0]
-    
-    if fac_down_dpi == None:
-        fac_down_dpi = 1.0/fac_dpi
-
-    page_errors = []
-    for page in pages:
-        outimgname = tmp_dir+ beginner + \
-              split_ffout + \
-             '_p'+str(page) + '.'+save_fmt
-        #print(outimgname)
-        #print(
-
-        # check if it exists
-        err = False
-        if (not os.path.exists(outimgname)) or (not check_exist):
-            try:
-                wimgPDF = WandImage(filename=pdfout +'[' + str(int(page)) + ']', 
-                                    resolution=pdffigures_dpi*fac_dpi, format='pdf') #2x DPI which shrinks later
-            except:
-                err = True
-                print('error in DPI')
-                print(pdfout)
-                
-            if not err:
-                thisSeq = wimgPDF.sequence
-                imPDF = thisSeq[0] # load PDF page into memory
-
-
-                # make sure we do our best to capture accurate text/images
-                imPDF.resize(width=int(round(fac_down_dpi*imPDF.width)),
-                             height=int(round(fac_down_dpi*imPDF.height)))
-                imPDF.background_color = Color("white")
-                imPDF.alpha_channel = 'remove'
-                WandImage(imPDF).save(filename=outimgname)
-                del imPDF
-        page_errors.append(err)
-    if return_error: 
-        return page_errors
 
     
 # get page's words
