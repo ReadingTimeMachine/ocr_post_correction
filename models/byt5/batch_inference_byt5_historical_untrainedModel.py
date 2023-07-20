@@ -176,43 +176,12 @@ model = T5ForConditionalGeneration.from_pretrained(
 tokenizer.model_max_length=4096
 model.config.max_length=4096
 
-
-# if snapshot == None:
-#     snapshots = glob(output_dir+'checkpoint*')
-#     order = []
-#     for s in snapshots:
-#         order.append(s.split('-')[-1])
-#     argsort = np.argsort(np.array(order).astype('int'))
-#     snapshot = np.array(snapshots)[argsort][-1]
-# else:
-#     snapshot = output_dir + snapshot
-
-# # historical trained only
-# if snapshot_hist == None:
-#     snapshots_hist = glob(output_dir_hist+'checkpoint*')
-#     order = []
-#     for s in snapshots_hist:
-#         order.append(s.split('-')[-1])
-#     argsort = np.argsort(np.array(order).astype('int'))
-#     snapshot_hist = np.array(snapshots_hist)[argsort][-1]
-# else:
-#     snapshot_hist = output_dir_hist + snapshot_hist
-
-
-# ckpoint = snapshot.split('-')[-1]
-# ckpoint_hist = snapshot_hist.split('-')[-1]
-
 historical_gt = glob(historical_dataset_dir + '*pickle')
 
 inds = np.arange(0,len(historical_gt)) 
 # debug
 #inds = inds[:12]
 #imod = 2
-
-# # load all models, replace orig
-# model = T5ForConditionalGeneration.from_pretrained(snapshot)
-# model_hist = T5ForConditionalGeneration.from_pretrained(snapshot_hist)
-
 
 start_time = time.time()
 
@@ -430,19 +399,19 @@ for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
         print(indd, ': error or timeout in base model')
         err = True
         
-    # historical model
-    try:
-        with timeout(seconds=int(wait_timeout)):
-            inputs = tokenizer(text, padding="longest", return_tensors="pt")
-            output = model_hist.generate(**inputs)
-            output_text_hist = tokenizer.decode(output[0], 
-                                           skip_special_tokens=skip_specials, 
-                                           clean_up_tokenization_spaces=True)
-            if verbose:
-                verbose_message += 'historical model predicted: '+ output_text_hist + '\n'
-    except:
-        print(indd, ': error or timeout in historical model')
-        err_hist = True
+    # # historical model
+    # try:
+    #     with timeout(seconds=int(wait_timeout)):
+    #         inputs = tokenizer(text, padding="longest", return_tensors="pt")
+    #         output = model_hist.generate(**inputs)
+    #         output_text_hist = tokenizer.decode(output[0], 
+    #                                        skip_special_tokens=skip_specials, 
+    #                                        clean_up_tokenization_spaces=True)
+    #         if verbose:
+    #             verbose_message += 'historical model predicted: '+ output_text_hist + '\n'
+    # except:
+    #     print(indd, ': error or timeout in historical model')
+    #     err_hist = True
         
     if verbose:
         verbose_message += '\n'
@@ -457,10 +426,10 @@ for sto, indd in yt.parallel_objects(inds, nProcs, storage=my_storage):
     else:
         df2['predicted_text'] = np.nan
         
-    if not err_hist:
-        df2['predicted_text_histOnlyModel'] = str(output_text_hist)
-    else:
-        df2['predicted_text_histOnlyModel'] = np.nan
+    # if not err_hist:
+    #     df2['predicted_text_histOnlyModel'] = str(output_text_hist)
+    # else:
+    #     df2['predicted_text_histOnlyModel'] = np.nan
          
     #import sys; sys.exit()
     
