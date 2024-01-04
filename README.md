@@ -9,7 +9,7 @@ This is the repository for TPDL 2023.  Organization is below:
 
 ## Data & Model Weights
 
-520k (500k in training, 10k in validation, 10k in test) randomized, aligned sentences and model weights are found on the [Zenodo page for this work]() (embargo'd until publication).
+520k (500k in training, 10k in validation, 10k in test) randomized, aligned sentences and model weights are found on the [Zenodo page for this work](https://zenodo.org/records/8006584).
 
 ## Folders
 
